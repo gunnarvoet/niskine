@@ -1,0 +1,25 @@
+name: niskine
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - matplotlib
+  - cartopy
+  - cmocean
+  - nbconvert<6
+  - nbformat
+  - numpy
+  - pandas
+  - pytest
+  - scipy
+  - tqdm
+  - xarray
+  - bottleneck
+  - netcdf4
+  - cftime
+  - gsw
+  - utide
+  - pip
+  - pip:
+    - jupytext
+    - "-e ."
