@@ -22,4 +22,6 @@ dependencies:
   - pip
   - pip:
     - jupytext
+    - "-e git+https://github.com/gunnarvoet/gvpy.git#egg=gvpy"
+    # Install the local niskine package in developer mode
     - "-e ."
