@@ -19,6 +19,7 @@ dependencies:
   - cftime
   - gsw
   - utide
+  - python-box
   - pip
   - pip:
     - jupytext

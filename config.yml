@@ -1,0 +1,14 @@
+path:
+  # Path to output data - refer to as $data in entries below. This data
+  # directory lives in the root directory given below (most likely where this
+  # config file lives as well).
+  data: data/
+  fig: fig/
+
+# Input and output data
+data:
+  proc:
+    # Processed adcp data. Link or copy processed netcdf files into this directory.
+    adcp: $data/proc/adcp/
+
+
