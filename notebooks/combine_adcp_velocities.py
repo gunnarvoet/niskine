@@ -76,4 +76,20 @@ adcp.u.plot(ax=ax)
 ax.set(xlabel='')
 ax.invert_yaxis()
 
+# %% [markdown]
+# Extract numpy arrays and make a plot without xarray.
+
 # %%
+u = adcp.u.data
+time = adcp.time.data
+z = adcp.z.data
+
+# %%
+u.shape
+
+# %%
+fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(7.5, 5),
+                       constrained_layout=True)
+h = ax.pcolormesh(time, z, u, cmap='RdBu_r', vmin=-0.6, vmax=0.6)
+plt.colorbar(h)
+ax.set(ylim=(1700, 800))
