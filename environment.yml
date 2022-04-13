@@ -3,6 +3,7 @@ channels:
   - conda-forge
 dependencies:
   - python=3.9
+  - black
   - mercurial   # for pulling pycurrents repo
   - matplotlib
   - cartopy
@@ -19,6 +20,10 @@ dependencies:
   - gsw
   - utide
   - python-box
+  # the following for pulling SSH data
+  - cdsapi
+  - cfgrib
+  - motuclient
   - pip
   - pip:
     - jupytext

@@ -11,4 +11,4 @@ data:
     # Processed adcp data. Link or copy processed netcdf files into this directory.
     adcp: $data/proc/adcp/
 
-
+  ssh: $data/ssh/
