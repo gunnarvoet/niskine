@@ -71,7 +71,7 @@ options_dict_example = {
 }
 
 # %% [markdown]
-# ### Download data
+# ### Download data (daily)
 
 # %% [markdown]
 # Download SSH data for 2019 and 2020.
@@ -79,22 +79,31 @@ options_dict_example = {
 # %%
 RM = niskine.io.RetrieveMercatorData(dataset='ssh')
 
+# %% [markdown]
+# We start the download in 2005 to have some climatological statistics. This is the time when Harper's altimetry time series started as well.
+
 # %%
 options_dict = dict(out_name='mercator_ssh.nc',
-    date_min="2019-01-01 00:00:00",
+    date_min="2005-05-01 00:00:00",
     date_max="2021-01-01 00:00:00",
     )
+
+# %% [markdown]
+# Note: The following runs for a while without showing any progress while just doing its job. Patience!
 
 # %%
 RM.retrieve_data(options_dict)
 
-# %% [markdown]
+# %% [markdown] heading_collapsed=true
+# ### Download data (hourly)
+
+# %% [markdown] hidden=true
 # Also download the hourly analysis data for 2020. Download file size cannot be over 1024 Mb. Need to download these month by month. Note: This takes a while to download.
 
-# %%
+# %% hidden=true
 RM = niskine.io.RetrieveMercatorData(dataset='hourly')
 
-# %%
+# %% hidden=true
 mm = np.arange(np.datetime64("2020-01-01 00:30:00"), np.datetime64("2020-12-31 23:30:00"), dtype='datetime64[M]')
 
 for i in range(10):

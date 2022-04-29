@@ -10,5 +10,6 @@ data:
   proc:
     # Processed adcp data. Link or copy processed netcdf files into this directory.
     adcp: $data/proc/adcp/
+    mb: $data/proc/mb/merged_100_-28_-21_56_61.nc
 
   ssh: $data/ssh/

@@ -10,6 +10,7 @@ import gvpy as gv
 import getpass
 import motuclient, motu_utils
 import logging
+import xarray as xr
 
 
 def load_config() -> Box:
@@ -92,8 +93,15 @@ def link_proc_adcp(mooringdir):
                     pass
 
 
-def load_m1_adcp():
-    pass
+def load_adcp(mooring=1, sn=None):
+    conf = load_config()
+    if sn is None:
+        adcps = []
+        for sni in ADCPS[f'M{mooring}']:
+            adcp.append(xr.open_dataset(conf.data.proc.adcp.joinpath(f'M{mooring}_{sni}.nc'), engine='netcdf4'))
+        return adcps
+    else:
+        return xr.open_dataset(conf.data.proc.adcp.joinpath(f'M{mooring}_{sn}.nc'))
 
 
 class RetrieveMercatorData:

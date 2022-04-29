@@ -14,11 +14,13 @@ dependencies:
   - scipy
   - tqdm
   - xarray
+  - dask
   - bottleneck
   - netcdf4
   - cftime
   - gsw
   - utide
+  - eofs
   - python-box
   # the following for pulling SSH data
   - cdsapi
