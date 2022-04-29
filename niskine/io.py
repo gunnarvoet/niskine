@@ -64,6 +64,34 @@ def print_config(print_values=False):
     gv.misc.pretty_print(config, print_values=print_values)
 
 
+def link_proc_adcp(mooringdir):
+    """Link processed ADCP data files into package data directory.
+
+    Parameters
+    ----------
+    mooringdir : str or pathlib.Path
+        Directory with mooring data (NISKINE19 on kipapa) that contains
+        directories M1, M2 and M3. Links to the directory defined in the config
+        file as data.proc.adcp.
+    """
+    conf = load_config()
+    conf.data.proc.adcp.mkdir(exist_ok=True)
+    for mooring, adcps in ADCPS.items():
+        for adcp in adcps:
+            package_adcp_dir = conf.data.proc.adcp
+            file = (mooringdir.joinpath(mooring)
+                    .joinpath('ADCP')
+                    .joinpath('proc')
+                    .joinpath(f'SN{adcp}')
+                    .joinpath(f'{mooring}_{adcp}.nc'))
+            link_file = package_adcp_dir.joinpath(file.name)
+            if file.exists():
+                try:
+                    link_file.symlink_to(file)
+                except:
+                    pass
+
+
 def load_m1_adcp():
     pass
 
@@ -210,3 +238,10 @@ class _MotuOptions:
             return self.attrs[k]
         except KeyError:
             return None
+
+
+ADCPS = dict(
+    M1 = [3109, 9408, 13481, 14408, 22476, ],
+    M2 = [3110, 8063, 8065, 10219, 22479, 23615, ],
+    M3 = [344, 8122, 12733, 15339, 15694, ],
+        )

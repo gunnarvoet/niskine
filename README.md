@@ -11,7 +11,13 @@ import niskine
 ```
 
 ## Data Directory
-The data directory has been excluded via [.gitignore](.gitignore) to avoid adding large files to the repository. The structure of the data directory, however, is defined via [config.yml](config.yml) and can be generated locally. For example, processed (netcdf) ADCP data files are stored under `data/proc/adcp/`. Copy or link the files into this directory.
+The data directory has been excluded via [.gitignore](.gitignore) to avoid adding large files to the repository. The structure of the data directory, however, is defined via [config.yml](config.yml) and can be generated locally.
+
+For example, processed (netcdf) ADCP data files are stored under `data/proc/adcp/`. Copy or link the files into this directory. Running
+```python
+niskine.io.link_proc_adcp(<mooring_data_dir>)
+```
+will link the files if `<mooring_data_dir>` has the same structure as the mooring directory on kipapa.
 
 ## Collaborating on GitHub
 Fork the repository from https://github.com/modscripps/niskine to your GitHub account and clone the repository to your local computer from there.
