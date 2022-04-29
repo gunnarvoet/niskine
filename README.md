@@ -19,6 +19,13 @@ niskine.io.link_proc_adcp(<mooring_data_dir>)
 ```
 will link the files if `<mooring_data_dir>` has the same structure as the mooring directory on kipapa.
 
+## Jupyter Notebooks on GitHub
+To allow for cleaner version control, jupyter notebooks should be paired with python scripts (in the percent format) using [jupytext](https://jupytext.readthedocs.io/en/latest/). The scripts can easily be converted back to jupyter notebooks. For existing pairs, the notebook updates automatically when the .py file changes. If no notebook exists yet for a given .py file, it can be created on the command line as easy as
+```
+jupytext --to notebook <file.py>
+```
+This command creates the file `file.ipynb` that is now paired with the script. Changing the notebook and saving it will automatically change the paired script.
+
 ## Collaborating on GitHub
 Fork the repository from https://github.com/modscripps/niskine to your GitHub account and clone the repository to your local computer from there.
 
