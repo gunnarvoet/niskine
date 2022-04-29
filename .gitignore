@@ -1,6 +1,7 @@
 .DS_Store
 data/
 .mercator_credentials
+*.ipynb
 
 #########################################################
 # everything below auto-generated for python junk files #
