@@ -41,6 +41,9 @@ import niskine
 # %%
 conf = niskine.io.load_config()
 
+# %%
+ssh = niskine.io.load_ssh(hourly=True)
+
 # %% [markdown]
 # # NISKINe SSH Analysis
 
@@ -57,13 +60,7 @@ conf = niskine.io.load_config()
 # ## Altimetry data
 
 # %%
-altimetry_file = conf.data.ssh.joinpath('mercator_ssh.nc')
-
-alt = xr.open_dataset(altimetry_file)
-alt = alt.rename({'longitude': 'lon', 'latitude': 'lat'})
-
-# %%
-alt
+alt = niskine.io.load_ssh()
 
 # %%
 alt.sla.var(dim='time').plot()

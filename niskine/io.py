@@ -93,6 +93,36 @@ def link_proc_adcp(mooringdir):
                     pass
 
 
+def load_ssh(hourly=False):
+    """Load altimeter data.
+
+    Parameters
+    ----------
+    hourly : bool, optional
+        Set to True to load the hourly model data. Defaults to False (daily
+        data).
+
+    Returns
+    -------
+    ssh : xr.Dataset
+        SSH data.
+    """
+
+    conf = load_config()
+    if hourly:
+        ssh_files = sorted(conf.data.ssh.glob('hourly_ssh*'))
+        all_hourly = [xr.open_dataset(file) for file in ssh_files]
+        [ssh.close() for ssh in all_hourly]
+        ssh = xr.concat(all_hourly, dim='time')
+        ssh = ssh.squeeze().drop('depth')
+    else:
+        ssh_file = conf.data.ssh.joinpath('mercator_ssh.nc')
+        ssh = xr.open_dataset(ssh_file)
+        ssh.close()
+    ssh = ssh.rename({'longitude': 'lon', 'latitude': 'lat'})
+    return ssh
+
+
 def load_adcp(mooring=1, sn=None):
     conf = load_config()
     if sn is None:
