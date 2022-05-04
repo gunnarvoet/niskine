@@ -13,3 +13,6 @@ data:
     mb: $data/proc/mb/merged_100_-28_-21_56_61.nc
 
   ssh: $data/ssh/
+  wind:
+    dir: $data/wind/
+    era5: $data/wind/era5_uv_10m.nc 
