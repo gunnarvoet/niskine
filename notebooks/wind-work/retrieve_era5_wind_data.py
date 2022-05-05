@@ -112,7 +112,20 @@ c.retrieve(
 
 # %%
 era5uvwind = xr.open_dataset(gribfile, engine='cfgrib')
-era5uvwind = era5uvwind.drop(['number', 'step', 'surface'])
+
+# %% [markdown]
+# Let's make this file a little nicer to work with.
+
+# %%
+era5uvwind = era5uvwind.drop(['number', 'step', 'surface', 'valid_time'])
+era5uvwind = era5uvwind.rename({'latitude':'lat', 'longitude': 'lon'})
+
+# %%
+era5uvwind.time.attrs = dict(long_name='time')
+era5uvwind.u10.attrs = dict(long_name='u$_{\mathrm{10m}}$', units='m/s')
+era5uvwind.v10.attrs = dict(long_name='v$_{\mathrm{10m}}$', units='m/s')
+
+# %%
 era5uvwind.to_netcdf(ncfile)
 
 # %% [markdown]

@@ -123,6 +123,18 @@ def load_ssh(hourly=False):
     return ssh
 
 
+def load_wind_era5():
+    """Load ERA5 10m wind data.
+
+    Returns
+    -------
+    xr.Dataset
+        ERA5 10m wind.
+    """
+    conf = load_config()
+    return xr.open_dataset(conf.data.wind.era5)
+
+
 def load_adcp(mooring=1, sn=None):
     conf = load_config()
     if sn is None:
