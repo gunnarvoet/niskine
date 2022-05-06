@@ -4,6 +4,7 @@ Read and write data.
 
 from pathlib import Path
 import collections.abc
+import numpy as np
 import yaml
 from box import Box
 import gvpy as gv
@@ -76,21 +77,42 @@ def link_proc_adcp(mooringdir):
         file as data.proc.adcp.
     """
     conf = load_config()
+
+    if type(mooringdir) == str:
+        mooringdir = Path(mooringdir)
+
+    # Create directory where files will be linked to.
     conf.data.proc.adcp.mkdir(exist_ok=True)
+
+    ADCPS = _adcp_mooring_config()
+
     for mooring, adcps in ADCPS.items():
         for adcp in adcps:
             package_adcp_dir = conf.data.proc.adcp
-            file = (mooringdir.joinpath(mooring)
-                    .joinpath('ADCP')
-                    .joinpath('proc')
-                    .joinpath(f'SN{adcp}')
-                    .joinpath(f'{mooring}_{adcp}.nc'))
+            file = (
+                mooringdir.joinpath(mooring)
+                .joinpath("ADCP")
+                .joinpath("proc")
+                .joinpath(f"SN{adcp}")
+                .joinpath(f"{mooring}_{adcp}.nc")
+            )
             link_file = package_adcp_dir.joinpath(file.name)
             if file.exists():
                 try:
                     link_file.symlink_to(file)
                 except:
                     pass
+
+    # Link the Flowquest .mat file
+    file = mooringdir.joinpath("M2/ADCP/proc/FQ10185/fq_converted/FQ_InterpolatedFinal.mat")
+    link_file = package_adcp_dir.joinpath(file.name)
+    if not link_file.exists():
+        link_file.symlink_to(file)
+
+    # While we are at it, let's also link the mooring location file.
+    loc_file = Path(conf.mooring_locations)
+    if not loc_file.exists():
+        loc_file.symlink_to(mooringdir.joinpath(loc_file.name))
 
 
 def load_ssh(hourly=False):
@@ -110,16 +132,16 @@ def load_ssh(hourly=False):
 
     conf = load_config()
     if hourly:
-        ssh_files = sorted(conf.data.ssh.glob('hourly_ssh*'))
+        ssh_files = sorted(conf.data.ssh.glob("hourly_ssh*"))
         all_hourly = [xr.open_dataset(file) for file in ssh_files]
         [ssh.close() for ssh in all_hourly]
-        ssh = xr.concat(all_hourly, dim='time')
-        ssh = ssh.squeeze().drop('depth')
+        ssh = xr.concat(all_hourly, dim="time")
+        ssh = ssh.squeeze().drop("depth")
     else:
-        ssh_file = conf.data.ssh.joinpath('mercator_ssh.nc')
+        ssh_file = conf.data.ssh.joinpath("mercator_ssh.nc")
         ssh = xr.open_dataset(ssh_file)
         ssh.close()
-    ssh = ssh.rename({'longitude': 'lon', 'latitude': 'lat'})
+    ssh = ssh.rename({"longitude": "lon", "latitude": "lat"})
     return ssh
 
 
@@ -137,13 +159,21 @@ def load_wind_era5():
 
 def load_adcp(mooring=1, sn=None):
     conf = load_config()
+    ADCPS = _adcp_mooring_config()
     if sn is None:
         adcps = []
-        for sni in ADCPS[f'M{mooring}']:
-            adcp.append(xr.open_dataset(conf.data.proc.adcp.joinpath(f'M{mooring}_{sni}.nc'), engine='netcdf4'))
+        for sni in ADCPS[f"M{mooring}"]:
+            adcp.append(
+                xr.open_dataset(
+                    conf.data.proc.adcp.joinpath(f"M{mooring}_{sni}.nc"),
+                    engine="netcdf4",
+                )
+            )
         return adcps
     else:
-        return xr.open_dataset(conf.data.proc.adcp.joinpath(f'M{mooring}_{sn}.nc'))
+        return xr.open_dataset(
+            conf.data.proc.adcp.joinpath(f"M{mooring}_{sn}.nc")
+        )
 
 
 class RetrieveMercatorData:
@@ -290,8 +320,54 @@ class _MotuOptions:
             return None
 
 
-ADCPS = dict(
-    M1 = [3109, 9408, 13481, 14408, 22476, ],
-    M2 = [3110, 8063, 8065, 10219, 22479, 23615, ],
-    M3 = [344, 8122, 12733, 15339, 15694, ],
-        )
+def _adcp_mooring_config():
+    ADCPS = dict(
+        M1=[
+            3109,
+            9408,
+            13481,
+            14408,
+            22476,
+        ],
+        M2=[
+            3110,
+            8063,
+            8065,
+            10219,
+            22479,
+            23615,
+        ],
+        M3=[
+            344,
+            8122,
+            12733,
+            15339,
+            15694,
+        ],
+    )
+    return ADCPS
+
+
+def mooring_start_end_time(mooring=1):
+    timeslice = dict(
+        m1=slice(
+            np.datetime64("2019-05-17 16:00:00"),
+            np.datetime64("2020-10-05 09:00:00"),
+        ),
+        m2=slice(
+            np.datetime64("2019-05-16 15:00:00"),
+            np.datetime64("2020-10-05 15:00:00"),
+        ),
+        m3=slice(
+            np.datetime64("2019-05-15 18:00:00"),
+            np.datetime64("2020-10-06 09:00:00"),
+        ),
+    )
+    return timeslice[f"m{mooring}"]
+
+
+def mooring_location(mooring=1):
+    conf = load_config()
+    locs = xr.open_dataset(conf.mooring_locations)
+    loci = locs.sel(mooring=mooring)
+    return loci.lon_actual.item(), loci.lat_actual.item(), loci.depth_actual.item()
