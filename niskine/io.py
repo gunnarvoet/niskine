@@ -176,6 +176,11 @@ def load_adcp(mooring=1, sn=None):
         )
 
 
+def load_gridded_adcp(mooring=1):
+    conf = load_config()
+    return xr.open_dataset(conf.data.gridded.adcp.joinpath(f"M{mooring}_gridded_simple_merge_gaps_filled.nc"))
+
+
 class RetrieveMercatorData:
     def __init__(self, dataset):
         """Retrieve Copernicus data (SSH, Mercator Model).

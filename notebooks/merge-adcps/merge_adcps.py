@@ -71,6 +71,12 @@ conf.data.gridded.adcp.mkdir(exist_ok=True, parents=True)
 ma = niskine.merge.MergeADCP(mooring=1, method='simple')
 
 # %% hidden=true
+overlap = niskine.merge.determine_overlap(ma.adcps_sorted_ti_zi)
+
+# %% hidden=true
+overlap.sum(dim='adcp').plot()
+
+# %% hidden=true
 ma.merged.u.gv.tcoarsen().gv.tplot(vmin=-0.7, vmax=0.7)
 
 # %% [markdown] hidden=true
