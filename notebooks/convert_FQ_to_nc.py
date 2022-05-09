@@ -88,17 +88,17 @@ lon, lat, depth = niskine.io.mooring_location(mooring=1)
 fqz = -gsw.z_from_p(lrp, lat) + 306
 
 # %% [markdown]
-# This is how depth is currently calculated in the .m file `FQ_interpolateNewPressure.m`:
+# This is how depth was calculated in the .m file `FQ_interpolateNewPressure.m` (now corrected):
 
 # %%
-fqz_amy = lrp - lrp.mean() + fq_p_orig.mean()
+fqz_a = lrp - lrp.mean() + fq_p_orig.mean()
 
 # %%
 fqz.plot()
-fqz_amy.plot()
+fqz_a.plot()
 
 # %%
-(fqz-fqz_amy).mean().item()
+(fqz-fqz_a).mean().item()
 
 # %% [markdown]
 # Convert depth back to pressure.
@@ -126,6 +126,10 @@ fq_temperature = fq_pressure.copy() * np.nan
 
 # %%
 fqmat = gv.io.loadmat(conf.data.proc.adcp.joinpath("FQ_InterpolatedFinal.mat"))
+
+# %%
+fig, ax = gv.plot.quickfig()
+ax.plot(fqmat['z'][0, :])
 
 # %% [markdown]
 # Convert Matlab time.
