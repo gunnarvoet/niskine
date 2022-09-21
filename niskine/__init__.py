@@ -1,5 +1,5 @@
 """Top-level package for NISKINe analysis"""
 
 
-__all__ = ["io", "merge"]
-from . import io, merge
+__all__ = ["io", "merge", "calcs"]
+from . import io, merge, calcs

@@ -66,6 +66,22 @@ def print_config(print_values=False):
     gv.misc.pretty_print(config, print_values=print_values)
 
 
+def png(fname, subdir=None, **kwargs):
+    """Save figure as png to the path defined in config.yml.
+
+    Parameters
+    ----------
+    fname : str
+        Figure name without file extension.
+    """
+    cfg = load_config()
+    if subdir is not None:
+        figdir = cfg.path.fig.joinpath(subdir)
+    else:
+        figdir = cfg.path.fig
+    gv.plot.png(fname, figdir=figdir, **kwargs)
+
+
 def link_proc_adcp(mooringdir):
     """Link processed ADCP data files into package data directory.
 
@@ -179,6 +195,15 @@ def load_adcp(mooring=1, sn=None):
 def load_gridded_adcp(mooring=1):
     conf = load_config()
     return xr.open_dataset(conf.data.gridded.adcp.joinpath(f"M{mooring}_gridded_simple_merge_gaps_filled.nc"))
+
+
+def load_mld():
+    conf = load_config()
+    if conf.data.ml.mld.exists():
+        mld = xr.open_dataarray(conf.data.ml.mld)
+    else:
+        mld = mld_to_nc()
+    return mld
 
 
 class RetrieveMercatorData:
@@ -376,3 +401,27 @@ def mooring_location(mooring=1):
     locs = xr.open_dataset(conf.mooring_locations)
     loci = locs.sel(mooring=mooring)
     return loci.lon_actual.item(), loci.lat_actual.item(), loci.depth_actual.item()
+
+
+def mld_to_nc():
+    """Convert mixed layer depth time series at M1 from mat to netcdf.
+    """
+    conf = load_config()
+    # Load mixed layer depth as calculated by Anna.
+    try:
+        mldmat = gv.io.loadmat(conf.data.ml.mld_mat)
+    except:
+        print("Anna's mixed layer depth file needs to live under data/ml/")
+    # Generate xarray DataArray
+    mld = xr.DataArray(
+        data=mldmat.mld,
+        coords=dict(time=gv.time.mattime_to_datetime64(mldmat.time)),
+        dims=["time"],
+        name='mld',
+    )
+    # Interpolate over nans
+    mld = mld.interpolate_na(dim="time")
+    # Save to netcdf format
+    print(f"Saving mixed layer depth time series to\n{conf.data.ml.mld}")
+    mld.to_netcdf(conf.data.ml.mld)
+    return mld

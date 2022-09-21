@@ -20,4 +20,15 @@ data:
     dir: $data/wind/
     era5: $data/wind/era5_uv_10m.nc 
 
+  wind_work:
+    niskine_m1: $data/wind_work/ni_wind_work_niskine_m1.nc
+    niskine_m1_cumulative: $data/wind_work/ni_wind_work_niskine_m1_integrated.nc
+
+  # mixed layer properties
+  ml:
+    # mixed layer depth from Anna
+    mld_mat: $data/ml/MLD.mat
+    mld: $data/ml/mld.nc
+    ml_vel: $data/ml/mlvel.nc
+
 mooring_locations: $data/niskine_mooring_locations.nc

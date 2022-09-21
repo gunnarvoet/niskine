@@ -2,6 +2,7 @@
 data/
 .mercator_credentials
 *.ipynb
+fig/
 
 #########################################################
 # everything below auto-generated for python junk files #
