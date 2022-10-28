@@ -7,6 +7,12 @@ path:
 
 # Input and output data
 data:
+  input:
+    osnap:
+      $data/input/osnap/US_eastern_2014_2016/data/files/
+    argo_mld:
+      $data/input/argo_mld_climatology/Argo_mixedlayers_monthlyclim_04142022.nc
+
   proc:
     # Processed adcp data. Link or copy processed netcdf files into this directory.
     adcp: $data/proc/adcp/
@@ -14,6 +20,7 @@ data:
 
   gridded:
     adcp: $data/gridded/adcp/
+    osnap: $data/gridded/osnap/
 
   ssh: $data/ssh/
   wind:
@@ -23,6 +30,10 @@ data:
   wind_work:
     niskine_m1: $data/wind_work/ni_wind_work_niskine_m1.nc
     niskine_m1_cumulative: $data/wind_work/ni_wind_work_niskine_m1_integrated.nc
+    osnap_umm3: $data/wind_work/ni_wind_work_osnap_umm3.nc
+    osnap_umm3_cumulative: $data/wind_work/ni_wind_work_osnap_umm3_integrated.nc
+    osnap_umm4: $data/wind_work/ni_wind_work_osnap_umm4.nc
+    osnap_umm4_cumulative: $data/wind_work/ni_wind_work_osnap_umm4_integrated.nc
 
   # mixed layer properties
   ml:
@@ -30,5 +41,7 @@ data:
     mld_mat: $data/ml/MLD.mat
     mld: $data/ml/mld.nc
     ml_vel: $data/ml/mlvel.nc
+    # mixed layer depth extracted from the Argo MLD climatology
+    mld_argo: $data/ml/mld_argo.nc
 
 mooring_locations: $data/niskine_mooring_locations.nc

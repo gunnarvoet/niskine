@@ -82,6 +82,22 @@ def png(fname, subdir=None, **kwargs):
     gv.plot.png(fname, figdir=figdir, **kwargs)
 
 
+def pdf(fname, subdir=None, **kwargs):
+    """Save figure as pdf to the path defined in config.yml.
+
+    Parameters
+    ----------
+    fname : str
+        Figure name without file extension.
+    """
+    cfg = load_config()
+    if subdir is not None:
+        figdir = cfg.path.fig.joinpath(subdir)
+    else:
+        figdir = cfg.path.fig
+    gv.plot.pdf(fname, figdir=figdir, **kwargs)
+
+
 def link_proc_adcp(mooringdir):
     """Link processed ADCP data files into package data directory.
 

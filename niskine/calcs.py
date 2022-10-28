@@ -129,6 +129,14 @@ class NIWindWork(ABC):
         # First interpolate ocean velocities to time vector of ERA5 winds
         self.u_ocean = self.vel.u.interp_like(self.u10)
         self.v_ocean = self.vel.v.interp_like(self.u10)
+        # Now that we have ocean velocity and wind at the same time stamps
+        # let's make sure that the sampling period is one hour:
+        assert (
+            gv.time.convert_units(
+                self.u_ocean.time.diff(dim="time").median().data, unit="s"
+            )
+            == 3600
+        )
         # Calculate the wind speed relative to the ocean surface.
         if apply_current_feedback_correction:
             # Apply correction factor as done in Vic et al (2021)
@@ -141,7 +149,9 @@ class NIWindWork(ABC):
 
     def calculate_wind_stress(self):
         # Calculate wind stress from the wind relative to the ocean surface.
-        self.taux, self.tauy = gv.ocean.wind_stress(self.u_wind_relative, self.v_wind_relative)
+        self.taux, self.tauy = gv.ocean.wind_stress(
+            self.u_wind_relative, self.v_wind_relative
+        )
 
     def bandpass_windstress(self):
         taux_ni = bandpass_time_series(
@@ -206,7 +216,30 @@ class NIWindWorkNiskine(NIWindWork):
         # For NISKINe M1 we use velocities averaged over the mixed layer.
         self.vel = mixed_layer_vels()
         # Interpolate over NaNs, otherwise the bandpass filter throws out a lot of data.
-        self.vel = self.vel.interpolate_na(dim='time')
+        self.vel = self.vel.interpolate_na(dim="time")
+        self.determine_start_and_end_times()
+
+
+class NIWindWorkOsnap(NIWindWork):
+    def __init__(self, mooring=3, apply_current_feedback_correction=True):
+        self.mooring_id = mooring
+        self.apply_current_feedback_correction = apply_current_feedback_correction
+        self.calculate_wind_work()
+
+    def load_mooring_location(self):
+        # NISKINe mooring locations
+        m = niskine.osnap.Mooring(moorstr=f"UMM{self.mooring_id}")
+        self.lon, self.lat = m.lon[0], m.lat[0]
+        # keep the mooring data around for other calcs
+        self.mooring_data = m
+
+    def load_surface_velocities(self):
+        m = self.mooring_data
+        u = m.adcp.u.where(m.adcp.z < 200, drop=True).mean(dim="z")
+        v = m.adcp.v.where(m.adcp.z < 200, drop=True).mean(dim="z")
+        self.vel = xr.merge([u, v])
+        # Interpolate over NaNs, otherwise the bandpass filter throws out a lot of data.
+        self.vel = self.vel.interpolate_na(dim="time")
         self.determine_start_and_end_times()
 
 
