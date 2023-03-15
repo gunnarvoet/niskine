@@ -21,6 +21,9 @@ data:
   gridded:
     adcp: $data/gridded/adcp/
     osnap: $data/gridded/osnap/
+    temperature_10m_mat: $data/input/temperature/InterpolatedM1_10mBins.mat
+    temperature_mat: $data/input/temperature/M1Temperature.mat
+    temperature_10m_nc: $data/gridded/temperature/t_10m.nc
 
   ssh: $data/ssh/
   wind:

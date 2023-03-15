@@ -1,9 +1,9 @@
 """
-Analysis of OSNAP mooring data for NISKINe.
-This is the old collection of code I wrote before starting the niskine package.
+Calculate NI fluxes.
 """
 
 import numpy as np
+from matplotlib import ticker
 import xarray as xr
 from pathlib import Path
 import netCDF4
@@ -18,370 +18,6 @@ import pandas as pd
 import niskine
 
 
-class Mooring:
-    """Convert all data files from an OSNAP mooring into a Dataset.
-
-    Individual data files are listed in variables
-    ctdlist, adcplist, cmlist.
-
-    Data interpolated in time are in ctd, adcp, cm.
-
-    Parameters
-    ----------
-    moorstr : str
-        Mooring name, for example 'mm4', used to locate mooring files in the
-        raw data structure.
-    """
-
-    def __init__(self, moorstr):
-        # I/O
-        conf = niskine.io.load_config()
-        self._osnap_data = conf.data.input.osnap
-        self._moorstr = moorstr
-        self.allfiles = self.get_osnap_mooring_files()
-        self.adcpfiles = [fi for fi in self.allfiles if "ADCP" in fi.name]
-        self.cmfiles = [fi for fi in self.allfiles if "CM" in fi.name]
-        self.mctdfiles = [fi for fi in self.allfiles if "MCTD" in fi.name]
-
-        # Read ADCP files
-        self.adcplist = []
-        for i, fi in enumerate(self.adcpfiles):
-            self.adcplist.append(self.read_adcp_nc_file(fi))
-
-        # Read Current Meter files
-        self.cmlist = []
-        for i, fi in enumerate(self.cmfiles):
-            self.cmlist.append(self.read_cm_nc_file(fi))
-
-        # Read CTD files
-        self.ctdlist = []
-        for i, fi in enumerate(self.mctdfiles):
-            self.ctdlist.append(self.read_ctd_nc_file(fi))
-
-        self.common_time_vector()
-        self.get_position()
-        self.get_bottom_depth()
-        self.interpolate_time_ctd()
-        self.ctd_calcs()
-        self.interpolate_time_cm()
-        self.cm_calcs()
-        self.interpolate_time_adcp()
-
-        # self.bandpass_ctd()
-
-    def get_osnap_mooring_files(self):
-        """
-        Create a list of all files for this mooring.
-
-        Returns
-        -------
-        f : list
-            List with paths to data files.
-
-        Note
-        ----
-        This should work with the original data structure
-        as downloaded from the Duke server:
-        https://research.repository.duke.edu/concern/datasets/9593tv14n?locale=en
-
-        """
-        # we know the directories are unique
-        pattern = "*{}*".format(self._moorstr.upper())
-        d = next(self._osnap_data.glob(pattern))
-        # now look for all files
-        f = list(d.glob(pattern))
-        return f
-
-    def read_cm_nc_file(self, filename):
-        """Read current meter data from netcdf file.
-
-        Parameters
-        ----------
-        filename : netcdf
-            Current meter data from OSNAP data repository.
-
-        Returns
-        -------
-        ds : xarray.Dataset
-            Current meter data.
-        """
-        ds = xr.open_dataset(filename)
-        changenames = dict(
-            LATITUDE="lat",
-            LONGITUDE="lon",
-            TIME="time",
-            PRES="p",
-            VCUR="v",
-            UCUR="u",
-            WCUR="w",
-            ECUR="error",
-            DEPTH="z",
-        )
-        for k, v in changenames.items():
-            if k in ds:
-                ds = ds.rename({k: v})
-        return ds
-
-    def read_adcp_nc_file(self, filename):
-        """Read ADCP data from netcdf file.
-
-        Parameters
-        ----------
-        filename : netcdf
-            ADCP data from OSNAP data repository.
-
-        Returns
-        -------
-        ds : xarray.Dataset
-            ADCP data.
-        """
-        ds = xr.open_dataset(filename, drop_variables="BINDEPTH")
-        changenames = dict(
-            LATITUDE="lat",
-            LONGITUDE="lon",
-            TIME="time",
-            INSTRDEPTH="instdep",
-            BINDEPTH="bindep",
-            PRES="p",
-            VCUR="v",
-            UCUR="u",
-            WCUR="w",
-            ECUR="error",
-            DEPTH="z",
-        )
-        for k, v in changenames.items():
-            if k in ds:
-                ds = ds.rename({k: v})
-        # need to read bin depths separately using netcdf4 library directly
-        ds = ds.rename_dims({"BINDEPTH": "z"})
-        nc_fid = netCDF4.Dataset(filename, "r")
-        bindepths = nc_fid.variables["BINDEPTH"][:]
-        ds.coords["bindepth"] = (["time", "z"], bindepths)
-        # copy attributes
-        bd = nc_fid.variables["BINDEPTH"]
-        for attr in bd.ncattrs():
-            ds.bindepth.attrs[attr] = bd.getncattr(attr)
-        nc_fid.close()
-        return ds
-
-    def read_ctd_nc_file(self, filename):
-        """Read moored CTD data from netcdf file.
-
-        Parameters
-        ----------
-        filename : netcdf
-            Moored CTD data from OSNAP data repository.
-
-        Returns
-        -------
-        ds : xarray.Dataset
-            CTD data.
-        """
-        ds = xr.open_dataset(filename, drop_variables="BINDEPTH")
-        changenames = dict(
-            LATITUDE="lat",
-            LONGITUDE="lon",
-            TIME="time",
-            PRES="p",
-            TEMP="t",
-            PSAL="s",
-            DEPTH="z",
-        )
-        for k, v in changenames.items():
-            if k in ds:
-                ds = ds.rename({k: v})
-        return ds
-
-    def common_time_vector(self):
-        """Generate a common time vector for all instruments.
-
-        Note
-        ----
-        Currently hard coded to one hour intervals.
-        """
-        self.n = []
-        self.tmin = []
-        self.tmax = []
-        for ai in self.adcplist:
-            self.n.append(len(ai.time))
-            self.tmin.append(ai.time.min().data)
-            self.tmax.append(ai.time.max().data)
-        for ai in self.cmlist:
-            self.n.append(len(ai.time))
-            self.tmin.append(ai.time.min().data)
-            self.tmax.append(ai.time.max().data)
-        for ai in self.ctdlist:
-            self.n.append(len(ai.time))
-            self.tmin.append(ai.time.min().data)
-            self.tmax.append(ai.time.max().data)
-        self.time_start = np.datetime64(np.min(self.tmin), "h")
-        self.time_stop = np.datetime64(np.max(self.tmax), "h")
-        self.time = np.arange(self.time_start, self.time_stop, dtype="datetime64[h]")
-
-    def get_position(self):
-        """Add lon/lat as class attributes.
-        """
-        self.lon = self.cmlist[0].lon.data
-        self.lat = self.cmlist[0].lat.data
-
-    def get_bottom_depth(self):
-        ss = -1 * (gv.ocean.smith_sandwell(lon=self.lon, lat=self.lat).load().squeeze())
-        self.depth = ss.data
-
-    def interpolate_time_ctd(self):
-        """Interpolate CTD data to a common time vector.
-        """
-        nctd = []
-        for ci in self.ctdlist:
-            nctd.append(ci.interp(time=self.time))
-        self.ctd = xr.concat(nctd, dim="z")
-        self.ctd = self.ctd.rename({"z": "nomz"})
-        self.ctd = self.ctd.sortby("nomz")
-
-    def interpolate_time_cm(self):
-        """Interpolate current meter data to a common time vector.
-        """
-        ncm = []
-        for ci in self.cmlist:
-            ncm.append(ci.interp(time=self.time))
-        self.cm = xr.concat(ncm, dim="z")
-        self.cm = self.cm.rename({"z": "nomz"})
-        self.cm = self.cm.sortby("nomz")
-
-    def interpolate_time_adcp(self):
-        """Interpolate ADCP data in time and depth.
-        """
-        # time interpolation
-        nadcp = []
-        for ci in self.adcplist:
-            nadcp.append(ci.interp(time=self.time))
-
-        # depth interpolation
-        znew = np.arange(0, 810, 10)
-        ui = np.full((len(self.time), len(znew)), np.nan)
-        vi = np.full((len(self.time), len(znew)), np.nan)
-
-        allu = [ai.u for ai in nadcp]
-        allv = [ai.v for ai in nadcp]
-        allb = [ai.bindepth for ai in nadcp]
-
-        U = np.concatenate(allu, axis=1)
-        V = np.concatenate(allv, axis=1)
-        B = np.concatenate(allb, axis=1)
-
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            for i, (Ui, Vi, Bi) in enumerate(zip(U, V, B)):
-                ni = np.isfinite(Ui)
-                if len(np.flatnonzero(ni)) > 4:
-                    ui[i, :] = interp1d(
-                        Bi[ni], Ui[ni], bounds_error=False, fill_value=np.nan
-                    )(znew)
-                ni = np.isfinite(Vi)
-                if len(np.flatnonzero(ni)) > 4:
-                    vi[i, :] = interp1d(
-                        Bi[ni], Vi[ni], bounds_error=False, fill_value=np.nan
-                    )(znew)
-
-        adcp = xr.Dataset(
-            data_vars={"u": (["time", "z"], ui), "v": (["time", "z"], vi)},
-            coords={"time": (["time"], self.time), "z": (["z"], znew)},
-        )
-        self.adcp = adcp.transpose("z", "time")
-
-    def ctd_calcs(self):
-        """
-        Calculate absolute salinity, conservative and potential temperature
-        and depth.
-
-        Store them in the CTD Dataset.
-        """
-        self.ctd["SA"] = (
-            ["time", "nomz"],
-            gsw.SA_from_SP(self.ctd.s, self.ctd.p, self.lon, self.lat).data,
-        )
-        self.ctd["CT"] = (
-            ["time", "nomz"],
-            gsw.CT_from_t(self.ctd.SA, self.ctd.t, self.ctd.p).data,
-        )
-        self.ctd["th"] = (["time", "nomz"], gsw.pt_from_CT(self.ctd.SA, self.ctd.CT).data)
-        self.ctd["zz"] = (["time", "nomz"], -1 * gsw.z_from_p(self.ctd.p, self.lat).data)
-        self.ctd = self.ctd.squeeze().transpose("nomz", "time")
-
-    def cm_calcs(self):
-        self.cm["zz"] = (["time", "nomz"], -1 * gsw.z_from_p(self.cm.p, self.lat).data)
-        self.cm = self.cm.squeeze()
-        if "nomz" in self.cm.dims:
-            self.cm = self.cm.transpose("nomz", "time")
-
-    def shorten(self, timespan):
-        """
-        Return a shortened version.
-
-        Parameters
-        ----------
-        timespan : datestr or slice(datestr, datestr)
-            Time span to cut out. Can be a single string like `'2015-02'`
-            or a time span given by two strings as e.g.
-            `slice('2015-02-01', '2015-02-10')`
-
-        Returns
-        -------
-        Shortmoooring
-        """
-        return Shortmooring(self, timespan)
-
-    def save_to_netcdf(self):
-        """Save data from CTD / CM / ADCP in OSNAP mooring data structure to netcdf
-        files.
-        """
-        # Get output path from config
-        conf = niskine.io.load_config()
-        savedir = conf.data.gridded.osnap
-        savedir.mkdir(exist_ok=True)
-
-        outfile_base = self._moorstr.lower()
-
-        # Save CTD
-        ctd = self.ctd.drop(['SA', 'CT', 'th'])
-        savefile = outfile_base + '_ctd.nc'
-        savepath = savedir / savefile
-        ctd.to_netcdf(savepath)
-        # Save CM
-        savefile = outfile_base + '_cm.nc'
-        savepath = savedir / savefile
-        self.cm.to_netcdf(savepath)
-        # Save ADCP
-        savefile = outfile_base + '_adcp.nc'
-        savepath = savedir / savefile
-        self.adcp.to_netcdf(savepath)
-
-
-class Shortmooring:
-    """
-    Cut out a time segment from a Mooring object with all data necessary for
-    flux calculations.
-
-    Parameters
-    ----------
-    mooring : osnap.Mooring
-        Mooring object
-    timespan : datestr or slice(datestr, datestr)
-        Time span to cut out. Can be a single string like `'2015-02'`
-        or a time span given by two strings as e.g.
-        `slice('2015-02-01', '2015-02-10')`
-    """
-    def __init__(self, mooring, timespan):
-        self._moorstr = mooring._moorstr
-        self.cm = mooring.cm.sel(time=timespan)
-        self.adcp = mooring.adcp.sel(time=timespan)
-        self.ctd = mooring.ctd.sel(time=timespan)
-        self.lon = mooring.lon
-        self.lat = mooring.lat
-        self.depth = mooring.depth
-        self.time = self.ctd.time.data
-
-
 class Flux:
     """
     Calculate flux time series for OSNAP mooring.
@@ -394,7 +30,7 @@ class Flux:
         Bandwidth parameter
     type : str ['NI', 'M2'], optional
         Type of flux, determines center frequency for bandpass filter.
-        Default 'NI'.
+        Default 'NI'. NOT IMPLEMENTED YET.
     climatology : str ['ARGO', 'WOCE'], optional
         Select type of climatology to use for calculation of modes and
         vertical displacements. Default 'ARGO' which resolves the seasonal
@@ -425,18 +61,29 @@ class Flux:
         return f"flux calculations for OSNAP mooring {self.mooring._moorstr}"
 
     def band(self):
-        t = gv.ocean.inertial_period(lat=self.mooring.lat[0]) * 24
+        t = gv.ocean.inertial_period(lat=self.mooring.lat) * 24
         self.thigh = 1 / self.bandwidth * t
         self.tlow = self.bandwidth * t
 
     def background_gradients(self):
         if self.climatology == "ARGO":
-            self.N2s, self.Tzs = climatology_argo_woce(self.mooring)
+            self.N2s, self.Tzs = niskine.clim.climatology_argo_woce(
+                self.mooring.lon, self.mooring.lat, self.mooring.bottom_depth
+            )
             # interpolate to mooring time vector
-            self.N2 = interpolate_seasonal_data_to_mooring(self.mooring, self.N2s)
-            self.Tz = interpolate_seasonal_data_to_mooring(self.mooring, self.Tzs)
+            self.N2 = niskine.clim.interpolate_seasonal_data_to_mooring(
+                self.mooring.adcp.time, self.N2s
+            )
+            self.Tz = niskine.clim.interpolate_seasonal_data_to_mooring(
+                self.mooring.adcp.time, self.Tzs
+            )
         elif self.climatology == "WOCE":
-            self.N2, self.Tz = climatology_woce(self.mooring)
+            self.N2, self.Tz = niskine.clim.climatology_woce(
+                self.mooring.lon, self.mooring.lat, self.mooring.bottom_depth
+            )
+            # For now rename depth back to z. Eventually name it depth everywhere.
+            self.N2 = self.N2.rename(depth="z")
+            self.Tz = self.Tz.rename(depth="z")
 
     def find_modes(self):
         if self.climatology == "WOCE":
@@ -446,7 +93,8 @@ class Flux:
 
     def bandpass(self):
         self.mooring = bandpass_ctd(self.mooring, tlow=self.tlow, thigh=self.thigh)
-        self.mooring = bandpass_cm(self.mooring, tlow=self.tlow, thigh=self.thigh)
+        if hasattr(self.mooring, "cm"):
+            self.mooring = bandpass_cm(self.mooring, tlow=self.tlow, thigh=self.thigh)
         self.mooring = bandpass_adcp(self.mooring, tlow=self.tlow, thigh=self.thigh)
 
     def eta_modes(self):
@@ -475,12 +123,12 @@ class Flux:
             data_vars={
                 "fx_ni": (
                     ["time", "mode"],
-                    self.Fu,
+                    self.Fu.data,
                     {"long_name": "NI Flux U", "units": "W/m"},
                 ),
                 "fy_ni": (
                     ["time", "mode"],
-                    self.Fv,
+                    self.Fv.data,
                     {"long_name": "NI Flux V", "units": "W/m"},
                 ),
             },
@@ -488,7 +136,7 @@ class Flux:
                 "time": (["time"], self.mooring.time),
                 "mode": (
                     ["mode"],
-                    self.modes.mode,
+                    self.modes.mode.data,
                     {"long_name": "mode", "units": ""},
                 ),
             },
@@ -496,9 +144,7 @@ class Flux:
 
 
 def near_inertial_energy_flux(mooring, bandwidth, N2, Tz):
-    """Calculate near-inertial energy flux time series for one mooring.
-
-    """
+    """Calculate near-inertial energy flux time series for one mooring."""
     t = gv.ocean.inertial_period(lat=mooring.lat[0]) * 24
     thigh = 1 / bandwidth * t
     tlow = bandwidth * t
@@ -529,174 +175,6 @@ def calculate_flux(mooring, N2, Tz, tlow, thigh):
     up, vp = calculate_up_vp(mooring, beta_u, beta_v, hmodes)
     Fu, Fv = calculate_ni_flux(up, vp, pp, N2)
     return Fu, Fv
-
-
-def climatology_woce(mooring):
-
-    # load WOCE data
-    woce = gv.ocean.woce_climatology()
-    wprf = woce.sel(lon=mooring.lon + 360, lat=mooring.lat, method="nearest").squeeze()
-
-    # buoyancy frequency
-    SA = gsw.SA_from_SP(wprf.s, wprf.p, wprf.lon, wprf.lat)
-    CT = gsw.CT_from_t(SA, wprf.t, wprf.p)
-    N2, pmid = gsw.Nsquared(SA, CT, wprf.p, lat=wprf.lat)
-    ni = np.isfinite(N2)
-    N2 = N2[ni]
-    N2z = -1 * gsw.z_from_p(pmid[ni], mooring.lat)
-    # extend constant to bottom
-    if np.max(np.abs(N2z)) < mooring.depth:
-        N2z = np.append(N2z, np.abs(mooring.depth))
-        N2 = np.append(N2, N2[-1])
-    if N2z[0] > 0:
-        N2z = np.insert(N2z, 0, 0)
-        N2 = np.insert(N2, 0, N2[0])
-    N2 = xr.DataArray(N2, coords={"depth": (["depth"], N2z)}, dims=["depth"])
-    # Interpolate to depth vector with constant dz
-    zmax = mooring.depth + 10 - mooring.depth % 10
-    znew = np.arange(0, zmax, 10)
-    N2 = N2.interp(depth=znew)
-    N2.attrs = dict(long_name="N$^2$", units="1/s$^2$")
-    N2.depth.attrs = dict(long_name="depth", units="m")
-    # temperature gradient
-    Tz = wprf.th.differentiate("depth")
-    Tz = Tz.where(np.isfinite(Tz), drop=True)
-    if Tz.depth.max() < mooring.depth:
-        Tzd = Tz.isel(depth=-1)
-        Tzd.values = Tz[-1].data
-        Tzd["depth"] = mooring.depth
-        Tz = xr.concat([Tz, Tzd], dim="depth")
-    if Tz.depth.min() > 0:
-        Tzs = Tz.isel(depth=0)
-        Tzs.values = Tz[0].data
-        Tzs["depth"] = 0
-        Tz = xr.concat([Tzs, Tz], dim="depth")
-    # zi = np.flatnonzero((Tz.z <= 3000) & (np.isnan(Tz.data)))
-    # deeptz = Tz.where(((Tz.z <= 3000) & (Tz.z > 2000))).mean()
-    # Tz[zi] = deeptz
-    Tz.name = "Tz"
-    Tz = Tz.interp(depth=znew)
-    Tz.attrs = dict(long_name="T$_{z}$", units="°/m")
-    Tz.depth.attrs = dict(long_name="depth", units="m")
-    return N2, Tz
-
-
-def climatology_argo_woce(mooring):
-    """N2 and Tz for mooring location from WOCE Argo climatology.
-
-    Parameters
-    ----------
-    mooring : osnap.Mooring
-        Mooring structure
-
-    Returns
-    -------
-    N2 : xarray.DataArray
-        Profile of buoyancy frequency squared, from surface to mooring bottom depth.
-    Tz : xarray.DataArray
-        Vertical temperature gradient profile from surface to mooring bottom depth.
-
-    Notes
-    -----
-    - Data are extended to surface and seafloor (with depth from mooring structure).
-
-    - Profiles are sorted into a stable state prior to calculating N2 and Tz.
-
-    - Temperature gradient is calculated with z increasing towards the seafloor,
-    i.e. it has the wrong sign.
-
-    """
-    argo = gv.ocean.woce_argo_profile(mooring.lon, mooring.lat)
-    argo.coords["month"] = (
-        ["time"],
-        [
-            "Jan",
-            "Feb",
-            "Mar",
-            "Apr",
-            "May",
-            "Jun",
-            "Jul",
-            "Aug",
-            "Sep",
-            "Oct",
-            "Nov",
-            "Dec",
-        ],
-    )
-    # calculate pressure from depth
-    argo["p"] = (["z"], gsw.p_from_z(-argo.z, mooring.lat))
-    argo = argo.transpose("z", "time")
-    # bring pressure to same dimensions
-    _, argo["p"] = xr.broadcast(argo.s, argo.p)
-    # calculate absolute salinity
-    argo["SA"] = (["z", "time"], gsw.SA_from_SP(argo.s, argo.p, argo.lon, argo.lat))
-    # calculate conservative temperature
-    argo["CT"] = (["z", "time"], gsw.CT_from_t(argo.SA, argo.t, argo.p))
-    # potential density
-    argo["sg0"] = (["z", "time"], gsw.sigma0(argo.SA, argo.CT))
-
-    # now calculate N^2 after sorting by density. a climatology shouldn't be
-    # unstable anyways!
-    N2s = np.zeros((argo.t.shape[0] - 1, argo.t.shape[1])) * np.nan
-    N2s = xr.DataArray(data=N2s, dims=["z", "time"])
-    N2s.coords["time"] = argo.time
-    for i, (g, argoi) in enumerate(argo.groupby("time")):
-        argois = argoi.sortby("sg0")
-        argois["z"] = argoi.z
-        ptmp = gsw.p_from_z(-argoi.z, lat=mooring.lat)
-        N2, pmid = gsw.Nsquared(argois.SA, argois.CT, ptmp, lat=mooring.lat)
-        N2z = -gsw.z_from_p(pmid, lat=mooring.lat)
-        N2s[:, i] = N2
-    N2s.coords["z"] = N2z
-    N2s = N2s.where(np.isfinite(N2s), drop=True)
-    N2s = N2s.where(N2s > 0, np.nan)
-    # Extend constant to bottom
-    N2deep = xr.full_like(N2s, np.nan)
-    N2deep = N2deep.isel(z=-1)
-    N2deep["z"] = mooring.depth
-    N2deep.values = N2s.isel(z=-1)
-    # Extend constant to surface
-    N2shallow = N2deep.copy()
-    N2shallow["z"] = 0
-    N2shallowvalues = N2s.isel(z=0)
-    # Bring it all together
-    N2s = xr.concat([N2shallow, N2s, N2deep], dim="z")
-    N2s = N2s.transpose("z", "time")
-    # Get rid of any NaN's
-    N2s = N2s.interpolate_na(dim="z")
-    # Interpolate to depth vector with constant dz
-    zmax = mooring.depth + 10 - mooring.depth % 10
-    znew = np.arange(0, zmax, 10)
-    N2 = N2s.interp(z=znew)
-    N2.attrs = dict(long_name="N$^2$", units="1/s$^2$")
-    N2.z.attrs = dict(long_name="depth", units="m")
-    N2.name = "N2"
-
-    # temperature gradient
-    CT = argo.CT.where(np.isfinite(argo.CT), drop=True)
-    tz = []
-    for i, (g, CTi) in enumerate(CT.groupby("time")):
-        CTs = CTi.sortby(CTi, ascending=False)
-        CTs["z"] = CTi.z.data
-        tz.append(CTs.differentiate("z"))
-    Tz = xr.concat(tz, dim="time")
-    Tz.attrs = dict(long_name="T$_{z}$", units="°/m")
-    Tz.z.attrs = dict(long_name="depth", units="m")
-    Tz = Tz.transpose("z", "time")
-    # Extend constant to bottom
-    Tzdeep = xr.full_like(Tz, np.nan)
-    Tzdeep = Tzdeep.isel(z=-1)
-    Tzdeep["z"] = mooring.depth
-    Tzdeep.values = Tz.isel(z=-1)
-    # Extend constant to surface
-    Tzshallow = Tzdeep.copy()
-    Tzshallow["z"] = 0
-    Tzshallowvalues = Tz.isel(z=0)
-    Tz = Tz.interp(z=znew)
-    Tz.name = "Tz"
-
-    return N2, Tz
 
 
 def bandpass_ctd(mooring, tlow, thigh):
@@ -892,24 +370,24 @@ def project_eta_on_modes(mooring, modes, nmodes=3):
             )
         # pack beta_hat into DataArray
         beta_eta = beta_to_array(mooring, nmodes, beta_eta)
-    elif 0: # new method
+    elif 0:  # new method
         # interpolate modes to depth of eta
         vmeta = modes.vmodes.interp(z=eta.nomz)
         vmeta = vmeta.broadcast_like(eta)
         ni = ~np.isnan(eta)
-        ds = xr.Dataset(data_vars={'vmodes': vmeta, 'eta': eta, 'good': ni})
+        ds = xr.Dataset(data_vars={"vmodes": vmeta, "eta": eta, "good": ni})
         nt = eta.time.shape[0]
         # pre-allocate array for beta
-        ds['beta_eta'] = (['time', 'mode'], np.full((nt, nmodes), np.nan))
+        ds["beta_eta"] = (["time", "mode"], np.full((nt, nmodes), np.nan))
         # loop over all time steps
-        for i, (g, di) in enumerate(ds.groupby('time')):
+        for i, (g, di) in enumerate(ds.groupby("time")):
             # solve
             y = di.eta.isel(nomz=di.good)
             X = di.vmodes.isel(nomz=di.good)
             X = np.c_[X, np.ones(X.shape[0])]
             beta_hat = np.linalg.lstsq(X, y, rcond=None)[0]
-            ds['beta_eta'][i, :] = beta_hat[:-1]
-    else: # only one set of modes old (wrong?) method
+            ds["beta_eta"][i, :] = beta_hat[:-1]
+    else:  # only one set of modes old (wrong?) method
         for i, (g, etai) in enumerate(mooring.eta.groupby("time")):
             ni = np.flatnonzero(np.isfinite(etai))
             beta_eta[i, :] = project_on_modes(
@@ -989,8 +467,8 @@ def project_on_modes(data, dataz, modes, modesz):
 
 def downsample_adcp_data(adcp):
     print("warning - still need to write good code for downsampling adcp data")
-    zbins = np.arange(0, 550, 50)
-    zbinlabels = np.arange(25, 525, 50)
+    zbins = np.arange(0, 1550, 50)
+    zbinlabels = np.arange(25, 1525, 50)
     binbpu = adcp.bpu.groupby_bins("z", bins=zbins, labels=zbinlabels).mean()
     binbpv = adcp.bpv.groupby_bins("z", bins=zbins, labels=zbinlabels).mean()
     return binbpu, binbpv
@@ -1000,8 +478,12 @@ def combine_adcp_cm_one_timestep(mooring, adcpu, adcpz, time):
     # select and downsample ADCP data, then combine with cm
     au = adcpu.isel(time=time).data
     az = adcpz.data
-    u = np.concatenate((au, mooring.cm.bpu.isel(time=time).data))
-    z = np.concatenate((az, mooring.cm.zz.isel(time=time).data))
+    if hasattr(mooring, "cm"):
+        u = np.concatenate((au, mooring.cm.bpu.isel(time=time).data))
+        z = np.concatenate((az, mooring.cm.zz.isel(time=time).data))
+    else:
+        u = au
+        z = az
     ni = np.isfinite(u)
     return u[ni], z[ni]
 
@@ -1037,7 +519,11 @@ def calculate_pressure_perturbation(mooring, beta_eta, modes, N2, nmodes=3):
             )
         pp -= np.mean(pp, axis=1, keepdims=True)
 
-    pp = xr.DataArray(data=pp, coords={'time': mooring.time, 'z': modes.z, 'mode': modes.mode}, dims=['time', 'z', 'mode'])
+    pp = xr.DataArray(
+        data=pp,
+        coords={"time": mooring.time, "z": modes.z, "mode": modes.mode},
+        dims=["time", "z", "mode"],
+    )
 
     return pp
 
@@ -1058,8 +544,16 @@ def calculate_up_vp(mooring, beta_u, beta_v, modes, nmodes=3):
             up[:, :, j] = np.multiply(bhmodes.isel(mode=j), beta_u.isel(mode=j))
             vp[:, :, j] = np.multiply(bhmodes.isel(mode=j), beta_v.isel(mode=j))
 
-    up = xr.DataArray(data=up, coords={'time': mooring.time, 'z': modes.z, 'mode': modes.mode}, dims=['time', 'z', 'mode'])
-    vp = xr.DataArray(data=vp, coords={'time': mooring.time, 'z': modes.z, 'mode': modes.mode}, dims=['time', 'z', 'mode'])
+    up = xr.DataArray(
+        data=up,
+        coords={"time": mooring.time, "z": modes.z, "mode": modes.mode},
+        dims=["time", "z", "mode"],
+    )
+    vp = xr.DataArray(
+        data=vp,
+        coords={"time": mooring.time, "z": modes.z, "mode": modes.mode},
+        dims=["time", "z", "mode"],
+    )
 
     return up, vp
 
@@ -1162,67 +656,74 @@ def interpolate_seasonal_modes_to_mooring(mooring, modes):
 
 
 def reconstruct_eta(flux):
-    print('warning - may not work for ARGO')
+    print("warning - may not work for ARGO")
     nz = flux.N2.z.shape[0]
     nt = flux.mooring.time.shape[0]
     nmodes = flux.nmodes
     etam = []
     bvmodes = flux.modes.vmodes.broadcast_like(flux.beta_eta)
     for j in range(nmodes):
-        etam.append(np.multiply(bvmodes.isel(mode=j),
-                                    flux.beta_eta.isel(mode=j)))
-    etam = xr.concat(etam, dim='mode')
-    etam.coords['mode'] = flux.modes.mode
+        etam.append(np.multiply(bvmodes.isel(mode=j), flux.beta_eta.isel(mode=j)))
+    etam = xr.concat(etam, dim="mode")
+    etam.coords["mode"] = flux.modes.mode
     return etam
 
 
 def plot_eta_modes_time_series(flux):
     etam = reconstruct_eta(flux)
-    fig, ax = plt.subplots(nrows=2, ncols=1, figsize=(8, 6),
-                       constrained_layout=True, sharex=True)
-    etam.sum(dim='mode').plot(y='z', yincrease=False, ax=ax[1],
-                            cbar_kwargs={'label': r'$\eta$ from modes'})
+    fig, ax = plt.subplots(
+        nrows=2, ncols=1, figsize=(8, 6), constrained_layout=True, sharex=True
+    )
+    etam.sum(dim="mode").plot(
+        y="z", yincrease=False, ax=ax[1], cbar_kwargs={"label": r"$\eta$ from modes"}
+    )
     gv.plot.concise_date(ax[0])
-    flux.mooring.eta.plot(y='nomz', yincrease=False, ax=ax[0],
-                          cbar_kwargs={'label': r'$\eta$ observed'})
+    flux.mooring.eta.plot(
+        y="nomz", yincrease=False, ax=ax[0], cbar_kwargs={"label": r"$\eta$ observed"}
+    )
     gv.plot.concise_date(ax[1])
-    ax[1].set(title='')
-    ax[0].set(xlabel='')
+    ax[1].set(title="")
+    ax[0].set(xlabel="")
 
 
 def plot_eta_modes_one_time_step(flux, ti, etam=None):
     if etam is None:
         etam = reconstruct_eta(flux)
-    etams = etam.isel(time=ti).sum(dim='mode')
+    etams = etam.isel(time=ti).sum(dim="mode")
     fig, ax = gv.plot.quickfig(w=4)
-    flux.mooring.eta.isel(time=ti).plot(y='nomz', linestyle='', marker='o', color='0.2')
-    etam.isel(time=ti).plot(y='z', hue='mode', color='0.8', add_legend=False)
-    etam.isel(time=ti, mode=range(2)).plot(y='z', hue='mode',
-                                            color='pink', add_legend=False)
+    flux.mooring.eta.isel(time=ti).plot(y="nomz", linestyle="", marker="o", color="0.2")
+    etam.isel(time=ti).plot(y="z", hue="mode", color="0.8", add_legend=False)
+    etam.isel(time=ti, mode=range(2)).plot(
+        y="z", hue="mode", color="pink", add_legend=False
+    )
 
-    etams.plot(y='z', color='0.2')
+    etams.plot(y="z", color="0.2")
     # (etams-etams.mean(dim='z')).plot(y='z', color='0.2', linestyle='--')
     ax.invert_yaxis()
 
 
 def plot_up_modes_time_series(flux):
     fig, ax = gv.plot.quickfig(h=3.5, w=6)
-    flux.up.sum(dim='mode').plot(y='z', yincrease=False,
-                            cbar_kwargs={'label': r'$u^\prime$ from modes',
-                                         'shrink': 0.7},)
+    flux.up.sum(dim="mode").plot(
+        y="z",
+        yincrease=False,
+        cbar_kwargs={"label": r"$u^\prime$ from modes", "shrink": 0.7},
+    )
     gv.plot.concise_date(ax)
-    ax.set(xlabel='')
+    ax.set(xlabel="")
 
 
 def plot_up_one_time_step(flux, ti):
     binbpu, binbpv = downsample_adcp_data(flux.mooring.adcp)
-    u, z = combine_adcp_cm_one_timestep(flux.mooring, binbpu,
-                                        binbpu.z_bins, ti)
+    u, z = combine_adcp_cm_one_timestep(flux.mooring, binbpu, binbpu.z_bins, ti)
     fig, ax = gv.plot.quickfig(yi=False, w=4)
-    ax.plot(u, z, 'ko')
-    flux.up.isel(time=ti).plot(y='z', hue='mode', color='0.8')
-    flux.up.isel(time=ti).sum(dim='mode').plot(y='z', color='0.2')
+    ax.plot(u, z, "ko")
+    flux.up.isel(time=ti).plot(y="z", hue="mode")
+    flux.up.isel(time=ti).sum(dim="mode").plot(y="z", color="0.2")
     gv.plot.xsym()
+    ax.grid()
+    ax.set(ylabel="depth [m]", xlabel="velocity [m/s]")
+    ax.xaxis.set_major_locator(ticker.MaxNLocator(5))
 
 
 def _consec_blocks(idx=None, combine_gap=0, combine_run=0):

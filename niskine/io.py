@@ -12,6 +12,7 @@ import getpass
 import motuclient, motu_utils
 import logging
 import xarray as xr
+import gsw
 
 
 def load_config() -> Box:
