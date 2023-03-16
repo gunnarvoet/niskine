@@ -6,11 +6,11 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.13.8
+#       jupytext_version: 1.14.0
 #   kernelspec:
-#     display_name: Python 3 (ipykernel)
+#     display_name: Python [conda env:niskine]
 #     language: python
-#     name: python3
+#     name: conda-env-niskine-py
 # ---
 
 # %% [markdown]
@@ -29,6 +29,7 @@ import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 
 import gvpy as gv
+import velosearaptor as trex
 import niskine
 
 # %reload_ext autoreload
@@ -54,20 +55,20 @@ niskine.io.link_proc_adcp(mooringdir)
 # The shallow ADCPs 3109 and 3110 show very short range during day time in the winter months. Investigate this a bit further and find out if data drop out due to a bad setting or due to instrument limitation.
 
 # %%
-conf = niskine.io.load_config()
-
-# %%
 a = niskine.io.load_adcp(mooring=1, sn=3109)
 
 # %%
 t1 = slice('2019-07-01', '2019-07-31')
-t2 = slice('2020-01-01', '2020-01-31')
+t2 = slice('2020-01-09', '2020-01-13')
 
 # %%
 a.sel(time=t1).u.dropna(dim='z', how='all').gv.tplot()
 
 # %%
 a.sel(time=t1).amp.dropna(dim='z', how='all').gv.tplot()
+
+# %%
+a
 
 # %%
 a.sel(time=t2).u.dropna(dim='z', how='all').gv.tplot()
@@ -77,3 +78,32 @@ a.sel(time=t2).amp.dropna(dim='z', how='all').gv.tplot()
 
 # %%
 a.sel(time=t2).pg.dropna(dim='z', how='all').gv.tplot()
+
+# %% [markdown]
+# Load raw data
+
+# %%
+rawfile = list(mooringdir.joinpath("M1/ADCP/raw/SN3109/").glob("*.000"))
+
+# %%
+rawfile
+
+# %%
+rr = trex.io.read_raw_rdi(rawfile[0].as_posix())
+
+# %%
+rr
+
+# %%
+fig, ax = plt.subplots(nrows=4, ncols=1, figsize=(7.5, 5),
+                       constrained_layout=True, sharex=True)
+for i, axi in enumerate(ax):
+    rr.sel(time=t2, beam=i+1).amp.dropna(dim='z', how='all').gv.tplot(ax=axi)
+
+# %%
+fig, ax = plt.subplots(nrows=4, ncols=1, figsize=(7.5, 5),
+                       constrained_layout=True, sharex=True)
+for i, axi in enumerate(ax):
+    rr.sel(time=t2, beam=i+1).cor.dropna(dim='z', how='all').gv.tplot(ax=axi)
+
+# %%
