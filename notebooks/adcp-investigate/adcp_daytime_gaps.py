@@ -39,7 +39,7 @@ import niskine
 # %config InlineBackend.figure_format = 'retina'
 
 # %%
-conf = niskine.io.load_config()
+cfg = niskine.io.load_config()
 
 # %% [markdown]
 # Link ADCP files into data dir
@@ -47,6 +47,8 @@ conf = niskine.io.load_config()
 # %%
 mooringdir = Path('/Users/gunnar/Projects/niskine/data/NISKINe/Moorings/NISKINE19')
 niskine.io.link_proc_adcp(mooringdir)
+
+# %%
 
 # %% [markdown]
 # # Shallow ADCP Winter Day Time Gaps
@@ -58,7 +60,7 @@ niskine.io.link_proc_adcp(mooringdir)
 a = niskine.io.load_adcp(mooring=1, sn=3109)
 
 # %%
-t1 = slice('2019-07-01', '2019-07-31')
+t1 = slice('2019-07-09', '2019-07-13')
 t2 = slice('2020-01-09', '2020-01-13')
 
 # %%
@@ -68,42 +70,157 @@ a.sel(time=t1).u.dropna(dim='z', how='all').gv.tplot()
 a.sel(time=t1).amp.dropna(dim='z', how='all').gv.tplot()
 
 # %%
-a
-
-# %%
 a.sel(time=t2).u.dropna(dim='z', how='all').gv.tplot()
 
 # %%
 a.sel(time=t2).amp.dropna(dim='z', how='all').gv.tplot()
 
 # %%
+a.sel(time=t1).pg.dropna(dim='z', how='all').gv.tplot()
+
+# %%
 a.sel(time=t2).pg.dropna(dim='z', how='all').gv.tplot()
 
 # %% [markdown]
-# Load raw data
+# Look into raw data. In addition to two ADCPs on M1 we have also the uplooker 300kHz on M2.
 
 # %%
-rawfile = list(mooringdir.joinpath("M1/ADCP/raw/SN3109/").glob("*.000"))
+rawfile_m1 = list(mooringdir.joinpath("M1/ADCP/raw/SN3109/").glob("*.000"))
+rawfile_m12 = list(mooringdir.joinpath("M1/ADCP/raw/SN9408/").glob("*.000"))
+rawfile_m2 = list(mooringdir.joinpath("M2/ADCP/raw/SN3110/").glob("*.000"))
 
 # %%
-rawfile
+r1 = trex.io.read_raw_rdi(rawfile_m1)
+r12 = trex.io.read_raw_rdi(rawfile_m12)
+r2 = trex.io.read_raw_rdi(rawfile_m2)
 
 # %%
-rr = trex.io.read_raw_rdi(rawfile[0].as_posix())
+r1.z
 
 # %%
-rr
+r1.sel(beam=beam).amp.rolling(time=4).mean().dropna(dim='z', how='all').gv.tplot(yincrease=False)
+
+# %%
+r1.sel(beam=beam, time=slice("2020-02", "2020-04")).amp.rolling(time=4).mean().dropna(dim='z', how='all').gv.tplot(yincrease=False)
+
+# %%
+r1.sel(time=slice("2020-02", "2020-04")).pressure.rolling(time=4).mean().gv.tplot()
+
+# %%
+r1.amp.sel(beam=beam, z=40, method="nearest").coarsen(time=200, boundary="pad").mean().plot()
+
+r12.amp.sel(beam=beam, z=40, method="nearest").coarsen(time=200, boundary="pad").mean().plot()
+
+
+# %%
+def plot_raw_one_beam_m1(time, beam):
+    fig, ax = plt.subplots(nrows=4, ncols=1, figsize=(7.5, 5),
+                           constrained_layout=True, sharex=True)
+    opts = dict(vmin=60, vmax=230, cmap="Spectral_r")
+    r1.sel(time=time, beam=beam).amp.dropna(dim='z', how='all').gv.tplot(ax=ax[0], yincrease=False, **opts)
+    r12.sel(time=time, beam=beam).amp.dropna(dim='z', how='all').gv.tplot(ax=ax[1], **opts)
+    opts2 = dict(vmin=0, vmax=150, cmap="magma")
+    r1.sel(time=time, beam=beam).cor.dropna(dim='z', how='all').gv.tplot(ax=ax[2], yincrease=False, **opts2)
+    r12.sel(time=time, beam=beam).cor.dropna(dim='z', how='all').gv.tplot(ax=ax[3], **opts2)
+    
+    if np.datetime64(time.start)<np.datetime64("2020-01-01"):
+        plt.suptitle("summer @ M1")
+    else:
+        plt.suptitle("winter @ M1")
+            
+
+
+# %%
+beam = 1
+
+# %%
+plot_raw_one_beam_m1(t1, beam)
+niskine.io.png(f"m1_raw_beam{beam}_summer")
+
+# %%
+plot_raw_one_beam_m1(t2, beam)
+niskine.io.png(f"m1_raw_beam{beam}_winter")
+
+
+# %%
+def plot_raw_one_beam_m2(time, beam):
+    fig, ax = plt.subplots(nrows=2, ncols=1, figsize=(7.5, 3),
+                           constrained_layout=True, sharex=True)
+    opts = dict(vmin=60, vmax=230, cmap="Spectral_r")
+    r2.sel(time=time, beam=beam).amp.dropna(dim='z', how='all').gv.tplot(ax=ax[0], yincrease=False, **opts)
+    opts2 = dict(vmin=0, vmax=150, cmap="magma")
+    r2.sel(time=time, beam=beam).cor.dropna(dim='z', how='all').gv.tplot(ax=ax[1], yincrease=False, **opts2)
+    
+    if np.datetime64(time.start)<np.datetime64("2020-01-01"):
+        plt.suptitle("summer @ M2")
+    else:
+        plt.suptitle("winter @ M2")
+            
+
+
+# %%
+plot_raw_one_beam_m2(t1, beam)
+niskine.io.png(f"m2_raw_beam{beam}_summer")
+
+# %%
+plot_raw_one_beam_m2(t2, beam)
+niskine.io.png(f"m2_raw_beam{beam}_winter")
+
+# %%
+
+# %%
+
+# %%
 
 # %%
 fig, ax = plt.subplots(nrows=4, ncols=1, figsize=(7.5, 5),
                        constrained_layout=True, sharex=True)
 for i, axi in enumerate(ax):
-    rr.sel(time=t2, beam=i+1).amp.dropna(dim='z', how='all').gv.tplot(ax=axi)
+    r1.sel(time=t1, beam=i+1).amp.dropna(dim='z', how='all').gv.tplot(ax=axi)
 
 # %%
 fig, ax = plt.subplots(nrows=4, ncols=1, figsize=(7.5, 5),
                        constrained_layout=True, sharex=True)
 for i, axi in enumerate(ax):
-    rr.sel(time=t2, beam=i+1).cor.dropna(dim='z', how='all').gv.tplot(ax=axi)
+    r12.sel(time=t1, beam=i+1).amp.dropna(dim='z', how='all').gv.tplot(ax=axi)
+
+# %% [markdown]
+# Winter @ M1
+
+# %%
+fig, ax = plt.subplots(nrows=4, ncols=1, figsize=(7.5, 5),
+                       constrained_layout=True, sharex=True)
+for i, axi in enumerate(ax):
+    r1.sel(time=t2, beam=i+1).amp.dropna(dim='z', how='all').gv.tplot(ax=axi)
+
+# %%
+fig, ax = plt.subplots(nrows=4, ncols=1, figsize=(7.5, 5),
+                       constrained_layout=True, sharex=True)
+for i, axi in enumerate(ax):
+    r12.sel(time=t2, beam=i+1).amp.dropna(dim='z', how='all').gv.tplot(ax=axi)
+
+# %%
+fig, ax = plt.subplots(nrows=4, ncols=1, figsize=(7.5, 5),
+                       constrained_layout=True, sharex=True)
+for i, axi in enumerate(ax):
+    r2.sel(time=t2, beam=i+1).amp.dropna(dim='z', how='all').gv.tplot(ax=axi)
+
+# %%
+fig, ax = plt.subplots(nrows=4, ncols=1, figsize=(7.5, 5),
+                       constrained_layout=True, sharex=True)
+for i, axi in enumerate(ax):
+    r1.sel(time=t2, beam=i+1).cor.dropna(dim='z', how='all').gv.tplot(ax=axi)
+
+# %%
+fig, ax = plt.subplots(nrows=4, ncols=1, figsize=(7.5, 5),
+                       constrained_layout=True, sharex=True)
+for i, axi in enumerate(ax):
+    r12.sel(time=t2, beam=i+1).cor.dropna(dim='z', how='all').gv.tplot(ax=axi)
+
+# %%
+fig, ax = plt.subplots(nrows=4, ncols=1, figsize=(7.5, 5),
+                       constrained_layout=True, sharex=True)
+for i, axi in enumerate(ax):
+    r2.sel(time=t2, beam=i+1).cor.dropna(dim='z', how='all').gv.tplot(ax=axi)
 
 # %%
