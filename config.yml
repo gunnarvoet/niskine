@@ -8,19 +8,31 @@ path:
 # Input and output data
 data:
   input:
-    osnap:
+    osnap: # Directory with OSNAP mooring data
       $data/input/osnap/US_eastern_2014_2016/data/files/
-    argo_mld:
+    argo_mld: # Argo mixed layer climatology
       $data/input/argo_mld_climatology/Argo_mixedlayers_monthlyclim_04142022.nc
+    chipod: # Directory with chipod summaries. Currently linked here from elsewhere.
+      $data/input/chipod/
 
   proc:
-    # Processed adcp data. Link or copy processed netcdf files into this directory.
-    adcp: $data/proc/adcp/
-    mb: $data/proc/mb/merged_100_-28_-21_56_61.nc
+    adcp: # Directory with processed adcp data
+      $data/proc/adcp/
+    mb: # Processed multibeam bathymetric data
+      $data/proc/mb/merged_100_-28_-21_56_61.nc
+    sbe37: # Directory with processed microcat data
+      $data/input/sbe37/
+    thermistor: # Directory with processed thermistor data
+      $data/proc/thermistor/
+    thermistor2min: # 2 minute interpolated thermistor data
+      $data/proc/thermistor_2min/
 
   gridded:
     adcp: $data/gridded/adcp/
     osnap: $data/gridded/osnap/
+    # gridded thermistor data
+    temperature: $data/gridded/temperature/t_10m_2min.nc
+    # gridded thermistor data from Anna
     temperature_10m_mat: $data/input/temperature/InterpolatedM1_10mBins.mat
     temperature_mat: $data/input/temperature/M1Temperature.mat
     temperature_10m_nc: $data/gridded/temperature/t_10m.nc
@@ -48,3 +60,5 @@ data:
     mld_argo: $data/ml/mld_argo.nc
 
 mooring_locations: $data/niskine_mooring_locations.nc
+
+m1_sensor_config: $data/m1_sensor_distribution.csv

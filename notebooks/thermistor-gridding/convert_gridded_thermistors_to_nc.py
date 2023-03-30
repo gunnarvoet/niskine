@@ -25,8 +25,8 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 import numpy as np
 import xarray as xr
+import pandas as pd
 import gsw
-import cmocean
 
 import gvpy as gv
 
@@ -243,5 +243,145 @@ da.to_netcdf(cfg.data.gridded.temperature_10m_nc)
 ax = da.gv.tplot(cmap='Spectral_r', cbar_kwargs=dict(label="temperature [$^{\circ}$C]"))
 ax.set(title="NISKINe M1 gridded thermistor data")
 niskine.io.png("gridded_thermistors")
+
+# %% hidden=true
+ax = da.gv.tplot(cmap='Spectral_r', cbar_kwargs=dict(label="temperature [$^{\circ}$C]"), rasterized=True)
+ax.set(title="NISKINe M1 gridded thermistor data")
+gv.plot.axstyle(ax, grid=True)
+niskine.io.pdf("gridded_thermistors", dpi=600)
+
+# %% [markdown]
+# ## Re-Grid
+
+# %% [markdown]
+# Universal time vector for M1. We will go with hourly and interpolate all chipod and microcat pressure time series to this.
+#
+# Let's only run through May 2020 as chipods and microcats start dropping out. Actually, some Microcats start giving up earlier in the year but maybe they are not as important when we have the chipod pressure time series.
+
+# %%
+time = np.arange("2019-05-17 16:00:00", "2020-06-01 01:00:00", dtype='datetime64[h]')
+
+# %% [markdown]
+# ### Chipod pressure time series
+
+# %%
+chipod_path = Path("/Users/gunnar/Projects/niskine/data/NISKINe/Moorings/NISKINE19/M1/chipod/quick_summary")
+
+# %%
+files = sorted(chipod_path.glob("*.mat"))
+
+# %%
+files[-2]
+
+
+# %%
+def read_chipod_summary(file):
+    tmp = gv.io.loadmat(file)
+    chipod = gv.io.mat2dataset(tmp)
+    # convert PSI to dbar
+    chipod.attrs["sn"] = tmp["chipod"]
+    atm = 14.29
+    chipod["p"] = ("time", (chipod["P"].data - atm) / 1.47)
+    chipod = chipod.drop("P")
+    chipod = chipod.sel(time=chipod.time < np.datetime64("2022"))
+    return chipod
+
+
+# %% [markdown]
+# Unfortunately the summary files have hourly values, for proper depth gridding we will need to read pressure from the raw data files.
+#
+# I sent an email to Pavan and Kerry, maybe they have the pressure time series stored somewhere accessible.
+#
+# Actually, let's try to work with this, after all considerable mooring motion happens on longer time scales than one hour.
+
+# %%
+allp = []
+sn = []
+for file in files:
+    c = read_chipod_summary(file)
+    p = c.p.interp(time=time)
+    p = p.expand_dims("sn")
+    p.coords["sn"] = (("sn"), [c.sn])
+    allp.append(p)
+    sn.append(c.sn)
+
+# %%
+cc = xr.concat(allp, dim='sn',)
+
+# %%
+cc.gv.plot(hue="sn", add_legend=False, yincrease=False);
+
+# %% [markdown]
+# Let's get rid of the one with bad pressure.
+
+# %%
+cc = cc.sel(sn=cc.mean(dim="time") > 0)
+
+# %%
+cc.gv.plot(hue="sn", yincrease=False);
+
+# %% [markdown]
+# ### Microcat pressure time series
+
+# %%
+proc_dir = Path("/Users/gunnar/Projects/niskine/data/NISKINe/Moorings/NISKINE19/M1/SBE37/proc")
+
+# %%
+sbes = []
+sbesn = []
+for d in proc_dir.glob("SN*"):
+    sn = d.name.split("N")[1]
+    sbesn.append(sn)
+    dd = list(d.glob("*.nc"))
+    sbes.append(xr.open_dataset(dd[0]).interp(time=time))
+
+# %%
+s = xr.concat(sbes, "sn")
+
+# %%
+s.coords["sn"] = (("sn"), sbesn)
+
+# %%
+sp = s.p
+
+# %%
+sp.gv.plot(hue="sn", yincrease=False);
+
+# %%
+fig, ax = gv.plot.quickfig(grid=True)
+sp.gv.plot(hue="sn", yincrease=False, ax=ax)
+cc.gv.plot(hue="sn", yincrease=False, ax=ax)
+
+# %% [markdown]
+# ### Join chipod and microcat pressure datasets
+
+# %%
+p = xr.concat([cc, sp], dim="sn")
+
+# %% [markdown]
+# Sort by mean pressure? Or by spreadsheet?
+
+# %% [markdown]
+# ### Mooring spreadsheet for sensor depth
+
+# %% [markdown]
+# The `.csv` file was exported from the [mooring config spreadsheet](https://docs.google.com/spreadsheets/d/1MQlw1ow0Y2pQBhNj85RbAa9ELnzdttzBYEEfIe2yoRk/edit#gid=2019776936) and sligthly cleaned up afterwards.
+
+# %%
+# ls
+
+# %%
+mm = pd.read_csv("m1_sensor_distribution.csv", index_col="SN")
+
+# %%
+mm.depth.values
+
+# %% [markdown]
+# ### Adjust sensor depths based on pressure time series
+
+# %%
+
+# %% [markdown]
+# ### Generate depth time series for each thermistor
 
 # %%

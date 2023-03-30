@@ -2,6 +2,7 @@
 Read and write data.
 """
 
+import pathlib
 from pathlib import Path
 import collections.abc
 import numpy as np
@@ -11,6 +12,7 @@ import gvpy as gv
 import getpass
 import motuclient, motu_utils
 import logging
+import pandas as pd
 import xarray as xr
 import gsw
 
@@ -137,15 +139,53 @@ def link_proc_adcp(mooringdir):
                     pass
 
     # Link the Flowquest .mat file
-    file = mooringdir.joinpath("M2/ADCP/proc/FQ10185/fq_converted/FQ_InterpolatedFinal.mat")
+    file = mooringdir.joinpath(
+        "M2/ADCP/proc/FQ10185/fq_converted/FQ_InterpolatedFinal.mat"
+    )
     link_file = package_adcp_dir.joinpath(file.name)
     if not link_file.exists():
         link_file.symlink_to(file)
 
-    # While we are at it, let's also link the mooring location file.
-    loc_file = Path(conf.mooring_locations)
-    if not loc_file.exists():
-        loc_file.symlink_to(mooringdir.joinpath(loc_file.name))
+    # # While we are at it, let's also link the mooring location file.
+    # loc_file = Path(conf.mooring_locations)
+    # if not loc_file.exists():
+    #     loc_file.symlink_to(mooringdir.joinpath(loc_file.name))
+
+
+def link_proc_temperature(mooringdir):
+    """Link processed thermistor data files into package data directory.
+
+    Parameters
+    ----------
+    mooringdir : str or pathlib.Path
+        Directory with mooring data (NISKINE19 on kipapa) that contains
+        directories M1, M2 and M3. Links to the directory defined in the config
+        file as data.proc.thermistor.
+    """
+    conf = load_config()
+
+    if type(mooringdir) == str:
+        mooringdir = Path(mooringdir)
+
+    # Create directory where files will be linked to.
+    conf.data.proc.thermistor.mkdir(exist_ok=True)
+
+    # RBR Solos
+    rbr_dir = mooringdir.joinpath("M1").joinpath("RBRSolo").joinpath("proc")
+    files = rbr_dir.glob("*.nc")
+    for file in files:
+        link_file = conf.data.proc.thermistor.joinpath(f"{file.name[:6]}.nc")
+        if not link_file.exists():
+            link_file.symlink_to(file)
+
+    # SBE56
+    # SBE05600425_2020-10-08.nc
+    sbe_dir = mooringdir.joinpath("M1").joinpath("SBE56").joinpath("proc")
+    files = sbe_dir.glob("*.nc")
+    for file in files:
+        link_file = conf.data.proc.thermistor.joinpath(f"{int(file.name[6:11]):06d}.nc")
+        if not link_file.exists():
+            link_file.symlink_to(file)
 
 
 def load_ssh(hourly=False):
@@ -190,6 +230,12 @@ def load_wind_era5():
     return xr.open_dataset(conf.data.wind.era5)
 
 
+def load_thermistor(sn):
+    cfg = load_config()
+    file = cfg.data.proc.thermistor.joinpath(f"{sn:06}.nc")
+    return xr.open_dataarray(file)
+
+
 def load_adcp(mooring=1, sn=None):
     conf = load_config()
     ADCPS = _adcp_mooring_config()
@@ -204,14 +250,16 @@ def load_adcp(mooring=1, sn=None):
             )
         return adcps
     else:
-        return xr.open_dataset(
-            conf.data.proc.adcp.joinpath(f"M{mooring}_{sn}.nc")
-        )
+        return xr.open_dataset(conf.data.proc.adcp.joinpath(f"M{mooring}_{sn}.nc"))
 
 
 def load_gridded_adcp(mooring=1):
     conf = load_config()
-    return xr.open_dataset(conf.data.gridded.adcp.joinpath(f"M{mooring}_gridded_simple_merge_gaps_filled.nc"))
+    return xr.open_dataset(
+        conf.data.gridded.adcp.joinpath(
+            f"M{mooring}_gridded_simple_merge_gaps_filled.nc"
+        )
+    )
 
 
 def load_mld():
@@ -420,9 +468,93 @@ def mooring_location(mooring=1):
     return loci.lon_actual.item(), loci.lat_actual.item(), loci.depth_actual.item()
 
 
-def mld_to_nc():
-    """Convert mixed layer depth time series at M1 from mat to netcdf.
+def read_m1_sensor_config():
+    """Read sensor config for mooring M1.
+
+    Returns
+    -------
+    TODO
+
     """
+    cfg = load_config()
+    mm = pd.read_csv(cfg.m1_sensor_config, index_col="SN")
+    return mm
+
+
+def load_microcat(sn):
+    cfg = load_config()
+    dir = cfg.data.proc.sbe37
+    return xr.open_dataset(dir.joinpath(f"SN{sn}/SBE37_{sn}_NISKINE.nc"))
+
+
+def read_microcats(common_time=None):
+    """Read all processed microcat data and merge into one `xr.Dataset`.
+
+    Parameters
+    ----------
+    common_time : array-like, optional
+        Common time vector of type `np.datetime64` that data will be
+        interpolated to for merging. Defaults to the full deployment period of
+        mooring M1 at 20min interval.
+
+    Returns
+    -------
+    mc : xr.Dataset
+        Merged Microcat data.
+    """
+    if common_time is None:
+        timeslice = mooring_start_end_time(mooring=1)
+        common_time = np.arange(
+            timeslice.start, timeslice.stop, dtype="datetime64[20m]"
+        ).astype("datetime64[m]")
+    cfg = load_config()
+    dir = cfg.data.proc.sbe37
+    sbes = []
+    sbesn = []
+    for d in dir.glob("SN*"):
+        sn = d.name.split("N")[1]
+        sbesn.append(sn)
+        dd = list(d.glob("*.nc"))
+        sbes.append(xr.open_dataset(dd[0]).interp(time=common_time))
+    mc = xr.concat(sbes, "sn")
+    for sbei in sbes:
+        sbei.close()
+    sbesn = [int(sni) for sni in sbesn]
+    mc.coords["sn"] = (("sn"), sbesn)
+    # sort by mean pressure
+    mc["mean_pressure"] = mc.p.mean(dim="time")
+    mc = mc.sortby("mean_pressure")
+
+    return mc
+
+
+def read_chipod_summary(file):
+    """Read chipod summary file and return as `xr.Dataset`.
+
+    Parameters
+    ----------
+    file : pathlib.PosixPath
+        Path to summary file.
+
+    Returns
+    -------
+    chipod : xr.Dataset
+        Data from summary file.
+    """
+    tmp = gv.io.loadmat(file)
+    chipod = gv.io.mat2dataset(tmp)
+    # convert PSI to dbar
+    chipod.attrs["sn"] = tmp["chipod"]
+    atm = 14.29
+    chipod["p"] = ("time", (chipod["P"].data - atm) / 1.47)
+    chipod = chipod.drop("P")
+    # get rid of data with spurious time steps
+    chipod = chipod.sel(time=chipod.time < np.datetime64("2022"))
+    return chipod
+
+
+def mld_to_nc():
+    """Convert Anna's mixed layer depth time series at M1 from mat to netcdf."""
     conf = load_config()
     # Load mixed layer depth as calculated by Anna.
     try:
@@ -434,7 +566,7 @@ def mld_to_nc():
         data=mldmat.mld,
         coords=dict(time=gv.time.mattime_to_datetime64(mldmat.time)),
         dims=["time"],
-        name='mld',
+        name="mld",
     )
     # Interpolate over nans
     mld = mld.interpolate_na(dim="time")

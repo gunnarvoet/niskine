@@ -1,5 +1,7 @@
 .DS_Store
-data/
+data/*
+!data/m1_sensor_distribution.csv
+!data/niskine_mooring_locations.nc
 .mercator_credentials
 *.ipynb
 fig/
