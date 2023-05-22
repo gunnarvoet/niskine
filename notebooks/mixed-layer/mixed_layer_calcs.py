@@ -13,10 +13,10 @@
 #     name: conda-env-niskine-py
 # ---
 
-# %% [markdown]
+# %% [markdown] heading_collapsed=true
 # #### Imports
 
-# %%
+# %% hidden=true
 # %matplotlib inline
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -34,14 +34,15 @@ import niskine
 
 # %config InlineBackend.figure_format = 'retina'
 
-# %%
+# %% hidden=true
 cfg = niskine.io.load_config()
 
-# %%
+# %% hidden=true
 gv.plot.helvetica()
+mpl.rcParams["lines.linewidth"] = 1
 
 # %% [markdown]
-# # NISKINe Mixed Layer Calculations v2
+# # NISKINe Mixed Layer Calculations
 
 # %% [markdown]
 # Calculate mixed layer depth and mixed layer velocities at M1.
@@ -65,114 +66,6 @@ gv.plot.helvetica()
 # Actually, maybe we should not sort but just use unsorted temperature. Assuming that any temperature inversions are density-balanced, we actually get the best estimate by finding the **deepest** temperature that is still within the criterion.
 
 # %% [markdown]
-# ## MLD Class
-
-# %%
-MixedLayer = niskine.calcs.MixedLayerDepth()
-
-# %% [markdown]
-# Zoom into a few days for testing. The subset is stored under `subset`.
-
-# %%
-timespan = slice("2019-11-05", "2019-11-10")
-MixedLayer.pick_subset(timespan)
-
-# %%
-ax = MixedLayer.subset.gv.tplot()
-
-# %% [markdown]
-# Okay, this is great, we have some vertical variation in temperature and also some knockdown.
-
-# %% [markdown]
-# Generate a time series with the shallowest measurement and see where we observe the warmest temperature.
-
-# %%
-MixedLayer.determine_knockdown()
-
-# %%
-MixedLayer.depth_shallowest.gv.tplot()
-
-# %% [markdown]
-# The following finds the highest temperature and the depth of the highest temperature (which may be deeper than the shallowest observation).
-
-# %%
-MixedLayer.determine_highest_temp()
-
-# %%
-ax = MixedLayer.depth_shallowest.gv.tplot()
-(MixedLayer.depth_shallowest - MixedLayer.depth_highest_temp).plot(ax=ax)
-ax.invert_yaxis()
-
-# %% [markdown]
-# Calculate mixed layer depth based on a temperature criterion. We look for temperatures that are within $\Theta_\mathrm{high} - \Theta_\mathrm{criterion}$.
-
-# %%
-Tcrit = 0.5
-
-# %%
-MixedLayer.ptemp.sel(time="2020-02").gv.tplot()
-
-# %%
-tmp = MixedLayer.ptemp-MixedLayer.highest_temp
-
-# %% [markdown]
-# Blank out all data that are not within criterion range.
-
-# %%
-tmp2 = tmp.where(tmp+Tcrit>0)
-
-# %%
-tmp2.sel(time="2020-02").gv.tplot()
-
-# %% [markdown]
-# Create a mask from the data within range. We are just interested in the deepest data point still in range of the temperature criterion.
-
-# %%
-tmp3 = ~np.isnan(tmp2)
-
-# %%
-# cmap for False and True
-cmap = mpl.colors.ListedColormap(['white', 'steelblue'])
-
-# %%
-ax = tmp3.sel(time="2020-02").gv.tplot(cmap=cmap, add_colorbar=False)
-
-# %% [markdown]
-# Okay, now we have marked all temperatures within criterion range. Now we want to find the deepest depth within range.
-
-# %% [markdown]
-# `argmax()` finds the first occurence of `True` but we want the last occurence. The trick here is reversing the order of the array.
-#
-# For a two-dimensional array, this would look like this:<br>
-# `last_true = a.shape[1] - np.argmax(a[:, ::-1], axis=1) - 1`
-
-# %%
-tmp3.sel(time="2020-02").argmax(dim='depth').plot()
-
-# %%
-data = tmp3.data
-
-# %%
-ind = data.shape[0] - np.argmax(data[::-1, :], axis=0) - 1
-
-# %%
-fig, ax = gv.plot.quickfig()
-ax.plot(ind)
-
-# %%
-mld = xr.DataArray(tmp3.depth.isel(depth=ind), coords=dict(time=tmp3.time.data), dims=["time"])
-
-# %%
-ax = tmp3.sel(time="2020-02").gv.tplot(cmap=cmap, add_colorbar=False)
-mld.sel(time="2020-02").gv.tplot(ax=ax, color="C3", linewidth=0.5)
-
-# %% [markdown]
-# Let's make sure we have the indexing right by selecting the last valid temperature in one profile and comparing it with what we get when using the index for the MLD found above (should come out to zero):
-
-# %%
-tmp2.isel(time=100).dropna(dim="depth")[-1].item()-tmp2.isel(time=100)[ind[100]].item()
-
-# %% [markdown]
 # Set up two masks:
 # - SST criterion
 # - knockdown criterion
@@ -190,14 +83,17 @@ MixedLayer = niskine.calcs.MixedLayerDepth()
 mld_final = MixedLayer.calc_final_mld_product(tcrit=0.2, sst_criterion=1.5, knockdown_criterion=100)
 
 # %% [markdown]
-# Let's compare with Anna's product to see if we are doing any better.
+# Let's compare with the old MLD product to see if we are doing any better.
 
 # %%
 old = xr.open_dataarray(cfg.data.ml.mld_old)
 
 # %%
-ax = mld_final.gv.tplot()
-ax = old.gv.tplot(ax=ax)
+ax = old.gv.tplot(color="0.6", label="previous MLD estimate")
+ax = mld_final.gv.tplot(ax=ax, label="new MLD estimate")
+ax.invert_yaxis()
+ax.legend()
+niskine.io.png("mld_compare_with_old_estimate", subdir="mixed-layer")
 
 # %% [markdown]
 # Figure with several panels showing how I arrive at the MLD time series.
@@ -216,33 +112,14 @@ niskine.io.pdf("mld_merged_with_argo_climatology", subdir="mixed-layer")
 # Compare monthly averages with the Argo climatology.
 
 # %%
-fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(7.5, 4),
-                       constrained_layout=True)
-MixedLayer.mld.groupby("time.month").mean().plot(color='C7', linestyle="--", yincrease=False, label='NISKINe M1 MLD no qc')
-MixedLayer.mld.where(MixedLayer.mask_knockdown & MixedLayer.mask_sst).groupby("time.month").mean().plot(color='C3', linestyle="-", yincrease=False, label='NISKINe M1 MLD')
-MixedLayer.mld_c.groupby("time.month").mean().plot(color='C0', yincrease=False, label='NISKINe M1 MLD w/ Argo')
-MixedLayer.argo_mld.da_m1.plot(color='C4', yincrease=False, label='Argo MLD Climatology (algorithm)')
-MixedLayer.argo_mld.dt_m1.plot(color='C6', yincrease=False, label='Argo MLD Climatology [threshold]')
-ax.legend()
-ax.set(ylabel='MLD [m]')
-gv.plot.axstyle(ax)
+MixedLayer.plot_argo_climatology_comparison()
 niskine.io.png('mld_argo_and_niskine', subdir='mixed-layer')
 
 # %% [markdown]
 # Save a dataset that has initial MLD / masks / combined product. What specifically do we want in there? Just the 0.2°C criterion or more?
 
-# %%
-out = xr.Dataset(
-    data_vars=dict(
-        mld=(("time"), MixedLayer.mld.data), 
-        mld_c=(("time"), MixedLayer.mld_c.data),
-        sst=(("time"), MixedLayer.ssti.data), 
-        mask_sst=(("time"), MixedLayer.mask_sst.data), 
-        mask_knockdown=(("time"), MixedLayer.mask_knockdown.data), 
-        argo_mld=(("time"), MixedLayer.argo_mld_i.data), 
-                  ),
-    coords=dict(time=(("time"), MixedLayer.mld.time.data)),
-)
+# %% [markdown]
+# Also save only the final MLD product.
 
 # %%
 MixedLayer.save_results()
@@ -265,5 +142,3 @@ gv.plot.concise_date(ax)
 ax.legend()
 niskine.io.pdf('mlvel', subdir="mixed-layer")
 niskine.io.png('mlvel', subdir="mixed-layer")
-
-# %%

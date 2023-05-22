@@ -23,7 +23,6 @@ class MixedLayerDepth:
     """
 
     def __init__(self):
-        print("you can do this!!!")
         self.lon, self.lat, _ = niskine.io.mooring_location(mooring=1)
         self.load_temperature()
         self.calc_potential_temperature()
@@ -212,12 +211,37 @@ class MixedLayerDepth:
 
         gv.plot.concise_date_all()
 
+    def plot_argo_climatology_comparison(self):
+        fig, ax = plt.subplots(
+            nrows=1, ncols=1, figsize=(6, 4), constrained_layout=True
+        )
+        self.mld.groupby("time.month").mean().plot(
+            color="C7", linestyle="--", yincrease=False, label="NISKINe M1 MLD no qc"
+        )
+        self.mld.where(self.mask_knockdown & self.mask_sst).groupby(
+            "time.month"
+        ).mean().plot(
+            color="C3", linestyle="-", yincrease=False, label="NISKINe M1 MLD"
+        )
+        self.mld_c.groupby("time.month").mean().plot(
+            color="C0", yincrease=False, label="NISKINe M1 MLD w/ Argo"
+        )
+        self.argo_mld.da_m1.plot(
+            color="C4", yincrease=False, label="Argo MLD Climatology (algorithm)"
+        )
+        self.argo_mld.dt_m1.plot(
+            color="C6", yincrease=False, label="Argo MLD Climatology [threshold]"
+        )
+        ax.legend()
+        ax.set(ylabel="MLD [m]")
+        gv.plot.axstyle(ax)
+
     def save_results(self):
         cfg = niskine.io.CFG
         out = xr.Dataset(
             data_vars=dict(
-                mld=(("time"), self.mld.data),
-                mld_c=(("time"), self.mld_c.data),
+                mld_no_qc=(("time"), self.mld.data),
+                mld=(("time"), self.mld_c.data),
                 sst=(("time"), self.ssti.data),
                 mask_sst=(("time"), self.mask_sst.data),
                 mask_knockdown=(("time"), self.mask_knockdown.data),
@@ -226,7 +250,7 @@ class MixedLayerDepth:
             coords=dict(time=(("time"), self.mld.time.data)),
         )
         out.to_netcdf(cfg.data.ml.mld_with_extras)
-        out.mld_c.to_netcdf(cfg.data.ml.mld)
+        out.mld.to_netcdf(cfg.data.ml.mld)
 
 
 def mixed_layer_vels():
