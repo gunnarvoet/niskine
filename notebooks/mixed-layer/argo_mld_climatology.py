@@ -6,17 +6,17 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.1
+#       jupytext_version: 1.14.0
 #   kernelspec:
-#     display_name: Python 3 (ipykernel)
+#     display_name: Python [conda env:niskine]
 #     language: python
-#     name: python3
+#     name: conda-env-niskine-py
 # ---
 
-# %% [markdown] heading_collapsed=true
-# ##### Imports
+# %% [markdown]
+# #### Imports
 
-# %% hidden=true
+# %%
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
@@ -36,7 +36,7 @@ plt.ion()
 
 # %config InlineBackend.figure_format = 'retina'
 
-# %% hidden=true
+# %%
 conf = niskine.io.load_config()
 
 # %% [markdown]
@@ -58,19 +58,28 @@ mld_dt = xr.DataArray(data=mld_all.mld_dt_mean.data, coords=dict(lon=mld_all.lon
 mld_argo = xr.merge([mld_dt, mld_da])
 
 # %%
+mld_argo.da.attrs = dict(long_name='Argo MLD Climatology (algorithm)', units='m')
+mld_argo.dt.attrs = dict(long_name='Argo MLD Climatology (threshold)', units='m')
+
+# %% [markdown]
+# Interpolate to NISKINe M1 and add to data structure.
+
+# %%
+# Load NISKINe M1 location
+lon, lat, dep = niskine.io.mooring_location(mooring=1)
+
+# %%
+mld_argo["da_m1"] = mld_argo.da.interp(lon=lon, lat=lat)
+mld_argo["dt_m1"] = mld_argo.dt.interp(lon=lon, lat=lat)
+
+# %%
+mld_argo
+
+# %%
 mld_argo.to_netcdf(conf.data.ml.mld_argo)
 
 # %% [markdown]
 # ## Compare with NISKINe MLD
-
-# %% [markdown]
-# Load NISKINe M1 location
-
-# %%
-lon, lat, dep = niskine.io.mooring_location(mooring=1)
-
-# %% [markdown]
-# Load MLD from M1
 
 # %%
 mldm1 = xr.open_dataarray(conf.data.ml.mld)
@@ -79,13 +88,11 @@ mldm1 = xr.open_dataarray(conf.data.ml.mld)
 fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(7.5, 5),
                        constrained_layout=True)
 mldm1.groupby("time.month").mean().plot(color='C0', yincrease=False, label='NISKINe M1')
-mld_da.interp(lon=lon, lat=lat).plot(color='C4', yincrease=False, label='Argo MLD Climatology (algorithm)')
-mld_dt.interp(lon=lon, lat=lat).plot(color='C6', yincrease=False, label='Argo MLD Climatology [threshold]')
+mld_argo.da_m1.plot(color='C4', yincrease=False, label='Argo MLD Climatology (algorithm)')
+mld_argo.dt_m1.plot(color='C6', yincrease=False, label='Argo MLD Climatology [threshold]')
 ax.legend()
 ax.set(ylabel='MLD [m]')
 niskine.io.png('mld_argo_and_niskine', subdir='mixed-layer')
-
-# %%
 
 # %%
 mld_argo.da.isel(month=8).plot()

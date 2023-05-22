@@ -263,11 +263,8 @@ def load_gridded_adcp(mooring=1):
 
 
 def load_mld():
-    conf = load_config()
-    if conf.data.ml.mld.exists():
-        mld = xr.open_dataarray(conf.data.ml.mld)
-    else:
-        mld = mld_to_nc()
+    cfg = load_config()
+    mld = xr.open_dataarray(cfg.data.ml.mld)
     return mld
 
 
@@ -553,7 +550,7 @@ def read_chipod_summary(file):
     return chipod
 
 
-def mld_to_nc():
+def old_mld_to_nc():
     """Convert Anna's mixed layer depth time series at M1 from mat to netcdf."""
     conf = load_config()
     # Load mixed layer depth as calculated by Anna.
@@ -572,5 +569,7 @@ def mld_to_nc():
     mld = mld.interpolate_na(dim="time")
     # Save to netcdf format
     print(f"Saving mixed layer depth time series to\n{conf.data.ml.mld}")
-    mld.to_netcdf(conf.data.ml.mld)
+    mld.to_netcdf(conf.data.ml.mld_old)
     return mld
+
+CFG = load_config()

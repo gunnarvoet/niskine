@@ -6,17 +6,17 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.1
+#       jupytext_version: 1.14.0
 #   kernelspec:
-#     display_name: Python 3 (ipykernel)
+#     display_name: Python [conda env:niskine]
 #     language: python
-#     name: python3
+#     name: conda-env-niskine-py
 # ---
 
-# %% [markdown] heading_collapsed=true
+# %% [markdown]
 # #### Imports
 
-# %% janus={"all_versions_showing": false, "cell_hidden": false, "current_version": 0, "id": "80aa11a68a82c8", "named_versions": [], "output_hidden": false, "show_versions": false, "source_hidden": false, "versions": []} hidden=true
+# %% janus={"all_versions_showing": false, "cell_hidden": false, "current_version": 0, "id": "80aa11a68a82c8", "named_versions": [], "output_hidden": false, "show_versions": false, "source_hidden": false, "versions": []}
 # %matplotlib inline
 from pathlib import Path
 import matplotlib.pyplot as plt
@@ -35,7 +35,7 @@ import niskine
 
 # %config InlineBackend.figure_format = 'retina'
 
-# %% hidden=true
+# %%
 conf = niskine.io.load_config()
 
 # %% [markdown]
@@ -179,3 +179,24 @@ era5uvwind.u10.sel(time='2020-01').var(dim='time').plot(**plot_options);
 
 # %%
 era5uvwind.u10.sel(time='2020-06').var(dim='time').plot(**plot_options);
+
+# %% [markdown]
+# Interpolate to M1 location and save.
+
+# %%
+lon, lat, depth = niskine.io.mooring_location(mooring=1)
+
+# %%
+m1wind = era5uvwind.interp(lon=lon, lat=lat)
+
+# %%
+m1wind.u10.plot()
+
+# %%
+ncfile = conf.data.wind.era5_m1
+
+# %%
+ncfile
+
+# %%
+m1wind.to_netcdf(ncfile)

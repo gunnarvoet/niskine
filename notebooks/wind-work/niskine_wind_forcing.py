@@ -72,6 +72,12 @@ cfg = niskine.io.load_config()
 # What we really want is a function that lets us calculate the NI wind work at any mooring, whether it is NISKINe or OSNAP. This is now happening in this notebook. I constructed an abstract base class for the wind work calculation, and then make specific cases for OSNAP and NISKINe. The mooring types between these projects differ a bit, but by using the abstract base class we can get them to a similar format and can run the same analysis functions on them.
 
 # %% [markdown]
+# ## ERA5 wind data
+
+# %%
+wind = xr.open_dataset(cfg.data.wind.era5)
+
+# %% [markdown]
 # ## Approach
 
 # %% [markdown]
@@ -100,6 +106,18 @@ cfg = niskine.io.load_config()
 # %%
 N = niskine.calcs.NIWindWorkNiskine()
 Nc = niskine.calcs.NIWindWorkNiskine(apply_current_feedback_correction=False)
+
+# %%
+fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(6.5, 4),
+                       constrained_layout=True)
+N.wind_work_int.plot(color='C0', linewidth=1, label='current feedback correction')
+Nc.wind_work_int.plot(color='C4', linewidth=1, label='no correction')
+ax.legend()
+ax.set(title='cumulative NI wind work at NISKINe M1', ylabel="P$_\mathregular{W}$ [kJ/m$^2$]")
+gv.plot.axstyle(ax)
+gv.plot.concise_date(ax)
+niskine.io.png('cumulative_wind_work_niskine_m1', subdir='wind-work')
+niskine.io.pdf('cumulative_wind_work_niskine_m1', subdir='wind-work')
 
 # %%
 fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(6.5, 4),
