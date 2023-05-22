@@ -13,10 +13,10 @@
 #     name: conda-env-niskine-py
 # ---
 
-# %% [markdown] heading_collapsed=true
+# %% [markdown]
 # #### Imports
 
-# %% hidden=true
+# %%
 # %matplotlib inline
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -34,10 +34,10 @@ import niskine
 
 # %config InlineBackend.figure_format = 'retina'
 
-# %% hidden=true
+# %%
 cfg = niskine.io.load_config()
 
-# %% hidden=true
+# %%
 gv.plot.helvetica()
 mpl.rcParams["lines.linewidth"] = 1
 

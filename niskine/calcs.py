@@ -249,6 +249,11 @@ class MixedLayerDepth:
             ),
             coords=dict(time=(("time"), self.mld.time.data)),
         )
+        out.mld.attrs = dict(long_name='MLD', units='m')
+        out.sst.attrs = dict(long_name='SST', units='°C')
+        out.mask_sst.attrs = dict(long_name='SST criterion mask', units='bool')
+        out.mask_knockdown.attrs = dict(long_name='knockdown criterion mask', units='bool')
+        out.argo_mld.attrs = dict(long_name='Argo MLD climatology', units='m')
         out.to_netcdf(cfg.data.ml.mld_with_extras)
         out.mld.to_netcdf(cfg.data.ml.mld)
 
