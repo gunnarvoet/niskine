@@ -209,6 +209,11 @@ class MixedLayerDepth:
             axi.set(ylim=[650, -100])
             axi.yaxis.set_major_locator(mpl.ticker.MultipleLocator(250))
 
+        # add subplot labels
+        gv.plot.subplotlabel(
+            ax, color="k", fs=12, fw="bold", bg="w", bga=1, x=0.01, y=0.86
+        )
+
         gv.plot.concise_date_all()
 
     def plot_argo_climatology_comparison(self):
@@ -249,11 +254,13 @@ class MixedLayerDepth:
             ),
             coords=dict(time=(("time"), self.mld.time.data)),
         )
-        out.mld.attrs = dict(long_name='MLD', units='m')
-        out.sst.attrs = dict(long_name='SST', units='°C')
-        out.mask_sst.attrs = dict(long_name='SST criterion mask', units='bool')
-        out.mask_knockdown.attrs = dict(long_name='knockdown criterion mask', units='bool')
-        out.argo_mld.attrs = dict(long_name='Argo MLD climatology', units='m')
+        out.mld.attrs = dict(long_name="MLD", units="m")
+        out.sst.attrs = dict(long_name="SST", units="°C")
+        out.mask_sst.attrs = dict(long_name="SST criterion mask", units="bool")
+        out.mask_knockdown.attrs = dict(
+            long_name="knockdown criterion mask", units="bool"
+        )
+        out.argo_mld.attrs = dict(long_name="Argo MLD climatology", units="m")
         out.to_netcdf(cfg.data.ml.mld_with_extras)
         out.mld.to_netcdf(cfg.data.ml.mld)
 
