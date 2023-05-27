@@ -153,14 +153,14 @@ s = m1.shorten(slice("2020-03", "2020-04"))
 # %%
 ax = s.adcp.u.gv.tplot()
 
-# %% [markdown]
-# TODO: Make sure I use the newly generated gridded thermistor product here.
+# %%
+s.ctd.th.gv.tplot()
 
 # %%
 s.ctd.th.gv.tplot()
 
 # %% [markdown]
-# Okay, maybe now we have the NISKINe in the right format for the flux calculation.
+# Okay, now we have the NISKINe in the right format for the flux calculation.
 
 # %%
 O = niskine.flux.Flux(mooring=os4, bandwidth=1.05, runall=True)
@@ -333,6 +333,9 @@ niskine.io.png("niskine_m1_ni_low_mode_flux", subdir="low-mode-fluxes")
 
 # %% [markdown]
 # Okay, so NISKINE is about an order of magnitude larger than OSNAP. How much flux do we see on average? These should be in W/m.
+
+# %%
+N.Fu.mean()
 
 # %%
 N.Fv.mean()

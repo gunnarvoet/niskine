@@ -87,8 +87,8 @@ class NISKINeMooring(Mooring):
         self._moorstr = f"NISKINe M{self.mooring})"
         self.add_location_data()
         self.load_adcp()
-        self.load_thermistor_data()
         self.common_time_vector()
+        self.load_thermistor_data()
 
     def add_location_data(self):
         lon, lat, bottom_depth = niskine.io.mooring_location(mooring=self.mooring)
@@ -107,10 +107,11 @@ class NISKINeMooring(Mooring):
         self.adcp = self.adcp.transpose("z", "time", "adcp")
 
     def load_thermistor_data(self):
-        t = xr.open_dataarray(self.cfg.data.gridded.temperature_10m_nc)
-        # Interpolate to less depth levels. This should probably be done righ
-        # away when interpolating. In fact all of the data collection below
-        # should happen somewhere else...
+        # t = xr.open_dataarray(self.cfg.data.gridded.temperature_10m_nc)
+        t = xr.open_dataarray(self.cfg.data.gridded.temperature)
+        t = t.interp(time=self.time)
+        # Interpolate to less depth levels. This should probably be done right
+        # away when interpolating.
 
         # Load thermistor data from near the bottom and merge with the rest
         tdeep = xr.open_dataarray(
