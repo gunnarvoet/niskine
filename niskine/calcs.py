@@ -304,43 +304,10 @@ def mixed_layer_vels():
     return mlvel
 
 
-def bandpass_time_series(data, tlow, thigh, minlen=120, fs=1):
-    """
-    Band-pass filter time series data.
-
-    Filters chunks of data if there are any NaNs in between.
-
-    Parameters
-    ----------
-    data : array_like
-        Time series data
-    tlow : float
-        cutoff period low
-    thigh : float
-        cutoff period high
-
-    Returns
-    -------
-    lpt : array_like
-        Band-passed data
-    """
-    gg = np.flatnonzero(np.isfinite(data))
-    blocks = _consec_blocks(gg, combine_gap=0)
-    lpt = np.full_like(data, np.nan)
-    for bi in blocks:
-        bb = data[bi[0] : bi[1]]
-        if bi[1] - bi[0] > minlen:
-            bpdata = gv.signal.bandpassfilter(
-                bb, lowcut=1 / tlow, highcut=1 / thigh, fs=fs, order=2
-            )
-            lpt[bi[0] : bi[1]] = bpdata
-    return lpt
-
-
 class NIWindWork(ABC):
 
     s_w = 0.3
-    bandwidth = 1.05
+    bandwidth = 1.06
 
     @abstractmethod
     def load_mooring_location(self):
@@ -496,6 +463,80 @@ class NIWindWorkOsnap(NIWindWork):
         # Interpolate over NaNs, otherwise the bandpass filter throws out a lot of data.
         self.vel = self.vel.interpolate_na(dim="time")
         self.determine_start_and_end_times()
+
+
+def determine_ni_band(bandwidth, lat=None):
+    if lat is None:
+        _, lat, _ = niskine.io.mooring_location(mooring=1)
+    # Determine NI band limits (in hours)
+    t = gv.ocean.inertial_period(lat=lat, verbose=False) * 24
+    ni_band_period_long = bandwidth * t
+    ni_band_period_short = 1 / bandwidth * t
+    return ni_band_period_long, ni_band_period_short
+
+
+def bandpass_time_series(data, tlow, thigh, minlen=120, fs=1):
+    """
+    Band-pass filter time series data.
+
+    Filters chunks of data if there are any NaNs in between.
+
+    Parameters
+    ----------
+    data : array_like
+        Time series data
+    tlow : float
+        cutoff period low
+    thigh : float
+        cutoff period high
+
+    Returns
+    -------
+    lpt : array_like
+        Band-passed data
+    """
+    gg = np.flatnonzero(np.isfinite(data))
+    blocks = _consec_blocks(gg, combine_gap=0)
+    lpt = np.full_like(data, np.nan)
+    for bi in blocks:
+        bb = data[bi[0] : bi[1]]
+        if bi[1] - bi[0] > minlen:
+            bpdata = gv.signal.bandpassfilter(
+                bb, lowcut=1 / tlow, highcut=1 / thigh, fs=fs, order=2
+            )
+            lpt[bi[0] : bi[1]] = bpdata
+    return lpt
+
+
+def lowpass_time_series(data, tlow, minlen=120, fs=1):
+    """
+    Band-pass filter time series data.
+
+    Filters chunks of data if there are any NaNs in between.
+
+    Parameters
+    ----------
+    data : array_like
+        Time series data
+    tlow : float
+        cutoff period low
+    thigh : float
+        cutoff period high
+
+    Returns
+    -------
+    lpt : array_like
+        Band-passed data
+    """
+    gg = np.flatnonzero(np.isfinite(data))
+    blocks = _consec_blocks(gg, combine_gap=0)
+    lpt = np.full_like(data, np.nan)
+    for bi in blocks:
+        bb = data[bi[0] : bi[1]]
+        if bi[1] - bi[0] > minlen:
+            bpdata = gv.signal.lowpassfilter(bb, lowcut=1 / tlow, fs=fs, order=2)
+            lpt[bi[0] : bi[1]] = bpdata
+    return lpt
 
 
 def _consec_blocks(idx=None, combine_gap=0, combine_run=0):

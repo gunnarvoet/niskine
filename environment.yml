@@ -22,6 +22,7 @@ dependencies:
   - utide
   - eofs
   - python-box
+  - metpy
   # the following for pulling SSH data
   - cdsapi
   - cfgrib

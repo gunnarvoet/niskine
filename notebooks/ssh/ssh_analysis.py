@@ -6,18 +6,17 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.13.8
+#       jupytext_version: 1.14.0
 #   kernelspec:
-#     display_name: Python 3 (ipykernel)
+#     display_name: Python [conda env:niskine]
 #     language: python
-#     name: python3
+#     name: conda-env-niskine-py
 # ---
 
 # %% [markdown]
 # #### Imports
 
 # %%
-# # %load /Users/gunnar/Projects/python/standard_imports.py
 # %matplotlib inline
 import scipy as sp
 import matplotlib.pyplot as plt
@@ -26,6 +25,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 import gsw
+import metpy
 from pathlib import Path
 import cartopy.crs as ccrs
 
@@ -39,10 +39,16 @@ import niskine
 # %config InlineBackend.figure_format = 'retina'
 
 # %%
-conf = niskine.io.load_config()
+gv.plot.helvetica()
 
 # %%
-ssh = niskine.io.load_ssh(hourly=True)
+cfg = niskine.io.load_config()
+
+# %%
+# load mooring locations
+locs = xr.open_dataset(cfg.mooring_locations)
+m1lon = locs.sel(mooring=1).lon_actual.item()
+m1lat = locs.sel(mooring=1).lat_actual.item()
 
 # %% [markdown]
 # # NISKINe SSH Analysis
@@ -51,76 +57,166 @@ ssh = niskine.io.load_ssh(hourly=True)
 # Calculate EKE as variance of eddy currents following [Heywood et al. 1994](https://agupubs.onlinelibrary.wiley.com/doi/pdf/10.1029/94JC01740)
 
 # %% [markdown]
-# This notebook was initially used for mooring planning purposes. An old copy is still somewhere in Gunnar's old `niskine/py` directory. Here we are looking at SSH data downloaded for the time of the NISKINe moorings but also starting at 2005 to have some climatological statistics.
+# Here we are looking at SSH data downloaded for the time of the NISKINe moorings but also starting at 2005 to have some climatological statistics.
 
 # %% [markdown]
-# ## Load data
+# I am still not 100% sure whether to use absolute geostrophic velocities or geostrophic velocity anomalies when calculating eddy kinetic energy and vorticity. I am super convinced though that it should be the anomalies, they are referenced to the [1993, 2012] period and thus calculated in the same way as sea level anomalies (`sla`).
 
-# %% [markdown]
-# ## Altimetry data
+# %% [markdown] heading_collapsed=true
+# ### Load Data
 
-# %%
+# %% hidden=true
 alt = niskine.io.load_ssh()
 
-# %%
-alt.sla.var(dim='time').plot()
+# %% hidden=true
+# we could also load hourly data (but don't have those for the whole time series)
+# ssh = niskine.io.load_ssh(hourly=True)
 
-# %% [markdown]
-# ### Bathymetry
-
-# %% [markdown]
+# %% [markdown] hidden=true
 # Load Smith & Sandwell
 
-# %%
+# %% hidden=true
 ss = gv.ocean.smith_sandwell(lon=alt.lon, lat=alt.lat)
 
-# %%
-ss.plot()
+# %% [markdown] heading_collapsed=true
+# ### Calculate EKE
 
-# %% [markdown]
-# Load processed multibeam data
-
-# %%
-mb = xr.open_dataarray(conf.data.proc.mb)
-
-# %%
-mb
-
-# %% [markdown]
-# Reduce in size for faster plotting - don't need the great resolution here.
-
-# %%
-mbc = mb.coarsen({'lon': 10, 'lat': 10}, boundary='pad')
-b = mbc.mean()
-
-# %%
-b.plot()
-
-# %% [markdown]
-# ## Plot
-
-# %%
-alt.ugos.isel(time=0).plot()
-alt.sla.isel(time=0).plot.contour()
-
-# %% [markdown]
-# Calculate EKE
-
-# %%
+# %% hidden=true
 alt['eke'] = 1/2 * (alt.ugosa**2 + alt.vgosa**2)
 
-# %%
-alt.eke.isel(time=0).plot()
-alt.sla.isel(time=0).plot.contour()
-ss.plot.contour(colors='k')
+# %% [markdown]
+# ### Calculate Vorticity
 
 # %%
-h = alt.eke.mean(dim='time').plot(cmap='magma')
-h.colorbar.set_label('EKE')
-ss.plot.contour(levels=np.arange(-3000, 500, 500), colors='w', linestyles='-', linewidths=0.5);
+f = gv.ocean.inertial_frequency(m1lat)
 
 # %% [markdown]
-# EKE climatology
+# `metpy` has a routine for vorticity calculation that is aware of lon/lat grids.
+
+# %%
+vort = metpy.calc.vorticity(alt.ugosa, alt.vgosa)
+# metpy adds units using pint - let's get rid of that for now
+vort = vort.metpy.dequantify()
+
+# %%
+vort = vort / f
+
+# %%
+vort.attrs = dict(long_name='$\zeta / f$', units='')
+
+# %% [markdown]
+# As a sanity check, plot sla contours over $\zeta/f$.
+
+# %%
+vort.isel(time=10).plot(cbar_kwargs=dict(label="$\zeta/f$", aspect=30, shrink=0.7), vmin=0.3, vmax=-0.3, cmap="RdBu")
+(alt.sla.isel(time=10)-alt.sla.mean(dim="time")).plot.contour(colors="k")
+
+# %% [markdown]
+# `xgcm` can also do this? In principle yes, but not straight out of the box. Leaving this here but not sure if I want to pursue this any further...
+
+# %%
+# import xgcm
+# from xgcm import as_grid_ufunc
+
+# grid = xgcm.Grid(alt)
+
+# def diff_forward_1d(a):
+#     return a[..., 1:] - a[..., :-1]
+
+# def diff(arr, axis):
+#     """First order forward difference along any axis"""
+#     return np.apply_along_axis(diff_forward_1d, axis, arr)
+ 
+
+# @as_grid_ufunc(
+#     "(X:center,Y:center),(X:center,Y:center)->(X:center,Y:center)",
+#     boundary_width={"X": (1, 0), "Y": (1, 0)},
+# )
+# def vorticity(u, v):
+#     v_diff_x = diff(v, axis=-2)
+#     u_diff_y = diff(u, axis=-1)
+#     return v_diff_x[..., 1:] - u_diff_y[..., 1:, :]
+
+# vort = vorticity(grid, alt.ugosa, alt.vgosa, axis = [("X", "Y"), ("X", "Y")])
+
+# %% [markdown]
+# Interpolate to M1 location.
+
+# %%
+m1vort = vort.interp(lon=m1lon, lat=m1lat)
+m1eke = alt.eke.interp(lon=m1lon, lat=m1lat)
+
+# %% [markdown]
+# Also interpolate to M2 and M3.
+
+# %%
+m2vort = vort.interp(lon=locs.sel(mooring=2).lon_actual, lat=locs.sel(mooring=2).lat_actual)
+m2eke = alt.eke.interp(lon=locs.sel(mooring=2).lon_actual, lat=locs.sel(mooring=2).lat_actual)
+
+# %%
+m3vort = vort.interp(lon=locs.sel(mooring=3).lon_actual, lat=locs.sel(mooring=3).lat_actual)
+m3eke = alt.eke.interp(lon=locs.sel(mooring=3).lon_actual, lat=locs.sel(mooring=3).lat_actual)
+
+# %%
+ax = m1vort.sel(time=slice("2019-05", "2020-10")).gv.tplot(label="M1")
+ax = m2vort.sel(time=slice("2019-05", "2020-10")).gv.tplot(ax=ax, label="M2")
+ax = m3vort.sel(time=slice("2019-05", "2020-10")).gv.tplot(ax=ax, label="M3")
+ax.legend()
+
+# %%
+fig, ax = gv.plot.quickfig()
+m1vort.plot.hist(bins=30, color="0.5", density=True)
+m1vort.sel(time=slice("2019-05", "2020-10")).plot.hist(bins=30, density=True, alpha=0.3)
+plt.axvline(x=0,color='0.3',linestyle='--')
+
+# %% [markdown]
+# Save M1 vorticity and EKE to use elsewhere.
+
+# %%
+out = xr.Dataset(data_vars=dict(vort=m1vort, eke=m1eke))
+
+# %%
+out.to_netcdf(cfg.data.ssh_m1)
+
+# %% [markdown]
+# ### Mean vorticity and mooring locations
+
+# %% [markdown]
+# For the whole 2005-2020 altimetry record.
+
+# %%
+mean_vort = vort.mean(dim="time")
+mean_vort.interp(lon=locs.lon_actual, lat=locs.lat_actual)
+
+# %%
+0.00229617 - -0.00371561
+
+# %%
+mean_vort.where(mean_vort.lat<62,drop=True).plot()
+print(mean_vort.where(mean_vort.lat<62,drop=True).min())
+print(mean_vort.where(mean_vort.lat<62,drop=True).max())
+
+# %%
+fig, ax = gv.plot.quickfig()
+mean_vort.plot(cbar_kwargs=dict(label="$\zeta/f$", aspect=30, shrink=0.7), vmin=0.03, vmax=-0.03, cmap="RdBu_r")
+ax.plot(locs.lon_actual, locs.lat_actual, "kx")
+ax.set(xlim=(-25, -18), ylim=(56, 62))
+
+# %% [markdown]
+# Only the mooring period.
+
+# %%
+mean_vort_niskine = vort.sel(time=slice("2019-05", "2020-10")).mean(dim="time")
+mean_vort_niskine.interp(lon=locs.lon_actual, lat=locs.lat_actual)
+
+# %%
+fig, ax = gv.plot.quickfig()
+mean_vort_niskine.plot(cbar_kwargs=dict(label="$\zeta/f$", aspect=30, shrink=0.7), vmin=0.03, vmax=-0.03, cmap="RdBu_r")
+ax.plot(locs.lon_actual, locs.lat_actual, "kx")
+ax.set(xlim=(-25, -18), ylim=(56, 62))
+
+# %% [markdown]
+# ### Monthly Mean EKE
 
 # %%
 eke_climatology = alt.eke.groupby('time.month').mean('time')
@@ -150,7 +246,7 @@ h.cbar.set_label('EKE')
 # plt.savefig('eke_climatology.png', dpi=200, bbox_inches='tight')
 
 # %% [markdown]
-# EOF analysis
+# ### EOF analysis
 
 # %%
 from eofs.xarray import Eof

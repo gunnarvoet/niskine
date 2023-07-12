@@ -10,6 +10,8 @@ import numpy as np
 import xarray as xr
 import pandas as pd
 
+import niskine
+
 
 def climatology_woce(lon, lat, bottom_depth):
     """Extract profiles of N^2 and Tz from WOCE climatology.
@@ -249,3 +251,16 @@ def interpolate_seasonal_data(time, da):
         dims=["z", "time"],
     )
     return da2.interp_like(time)
+
+
+def get_wkb_factors(adcp):
+    m1lon, m1lat, m1depth = niskine.io.mooring_location(mooring=1)
+    n2, tz = climatology_argo_woce(m1lon, m1lat, m1depth)
+    an2 = niskine.clim.interpolate_seasonal_data(adcp.time, n2)
+    adcp["n2"] = an2.interp_like(adcp)
+    adcp["N"] = np.sqrt(adcp.n2)
+    N0 = adcp.N.where((adcp.z<1200) & (adcp.z>300)).mean().item()
+    wkb = 1/np.sqrt(adcp.N/N0)
+    wkb.name = "wkb normalization factor"
+    return wkb
+    wkb.name = "wkb normalization"

@@ -37,6 +37,9 @@ import niskine
 # %%
 cfg = niskine.io.load_config()
 
+# %%
+gv.plot.helvetica()
+
 # %% [markdown]
 # # NISKINe Wind Forcing
 
@@ -119,20 +122,11 @@ gv.plot.concise_date(ax)
 niskine.io.png('cumulative_wind_work_niskine_m1', subdir='wind-work')
 niskine.io.pdf('cumulative_wind_work_niskine_m1', subdir='wind-work')
 
-# %%
-fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(6.5, 4),
-                       constrained_layout=True)
-N.wind_work_int.plot(color='C0', linewidth=1, label='current feedback correction')
-Nc.wind_work_int.plot(color='C4', linewidth=1, label='no correction')
-ax.legend()
-ax.set(title='cumulative NI wind work at NISKINe M1', ylabel="P$_\mathregular{W}$ [kJ/m$^2$]")
-gv.plot.axstyle(ax)
-gv.plot.concise_date(ax)
-niskine.io.png('cumulative_wind_work_niskine_m1', subdir='wind-work')
-niskine.io.pdf('cumulative_wind_work_niskine_m1', subdir='wind-work')
-
 # %% [markdown]
 # Plot ocean velocity, wind stress, and air-sea energy flux for one component
+
+# %%
+np.sqrt(N.taux**2 + N.tauy**2).plot(linewidth=1)
 
 # %%
 fig, ax = plt.subplots(nrows=3, ncols=1, figsize=(7, 5),
@@ -164,6 +158,9 @@ N.wind_work.to_netcdf(cfg.data.wind_work.niskine_m1.as_posix())
 
 # %%
 N.wind_work_int.to_netcdf(cfg.data.wind_work.niskine_m1_cumulative.as_posix())
+
+# %%
+np.sqrt(N.taux**2 + N.tauy**2).to_netcdf(cfg.data.wind_work.niskine_m1_wind_stress)
 
 # %% [markdown]
 # ## OSNAP Wind Work
@@ -197,3 +194,11 @@ No3.wind_work.to_netcdf(cfg.data.wind_work.osnap_umm3)
 No3.wind_work_int.to_netcdf(cfg.data.wind_work.osnap_umm3_cumulative)
 No4.wind_work.to_netcdf(cfg.data.wind_work.osnap_umm4)
 No4.wind_work_int.to_netcdf(cfg.data.wind_work.osnap_umm4_cumulative)
+
+# %% [markdown]
+# ## Save Data
+
+# %% [markdown]
+# Save a bunch of data into one dataset?
+
+# %%

@@ -203,3 +203,24 @@ temp = xr.open_dataarray(cfg.data.gridded.temperature)
 # %%
 ax = temp.sel(time="2019-06").gv.tplot()
 ax.set(ylim=[600, 0])
+
+# %%
+
+# %%
+
+# %%
+
+# %%
+ax = ma.sg0.gv.tplot()
+ax = mb.sg0.gv.tplot(ax=ax)
+ax = mc.sg0.gv.tplot(ax=ax)
+ax = md.sg0.gv.tplot(ax=ax)
+
+# %%
+ma
+
+# %%
+ax = ma.SP.gv.tplot()
+ax = mb.SP.gv.tplot(ax=ax)
+
+# %%
