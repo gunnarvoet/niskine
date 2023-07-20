@@ -24,8 +24,9 @@ class Flux:
 
     Parameters
     ----------
-    mooring : osnap.Mooring
-        Mooring data generated with `osnap.Mooring()`.
+    mooring : OSNAPMooring or NISKINeMooring
+        Mooring data generated with `mooring.OSNAPMooring()` or
+        `mooring.NISKINeMooring()`.
     bandwidth : float
         Bandwidth parameter
     type : str ['NI', 'M2'], optional

@@ -21,6 +21,9 @@ class Mooring(ABC):
 
     bandwidth = 1.05
 
+    def __repr__(self):
+        return f"data structure for mooring {self._moorstr}"
+
     @abstractmethod
     def add_location_data(self):
         pass
@@ -84,7 +87,7 @@ class NISKINeMooring(Mooring):
     def __init__(self):
         self.cfg = niskine.io.load_config()
         self.mooring = 1
-        self._moorstr = f"NISKINe M{self.mooring})"
+        self._moorstr = f"NISKINe M{self.mooring}"
         self.add_location_data()
         self.load_adcp()
         self.common_time_vector()
