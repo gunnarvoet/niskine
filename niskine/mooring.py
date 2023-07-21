@@ -22,7 +22,7 @@ class Mooring(ABC):
     bandwidth = 1.05
 
     def __repr__(self):
-        return f"data structure for mooring {self._moorstr}"
+        return f"data structure for mooring {self.name}"
 
     @abstractmethod
     def add_location_data(self):
@@ -66,7 +66,7 @@ class Shortmooring:
     """
 
     def __init__(self, mooring, timespan):
-        self._moorstr = mooring._moorstr
+        self.name = mooring.name
         self.adcp = mooring.adcp.sel(time=timespan)
         if hasattr(mooring, "cm"):
             self.cm = mooring.cm.sel(time=timespan)
@@ -87,7 +87,7 @@ class NISKINeMooring(Mooring):
     def __init__(self):
         self.cfg = niskine.io.load_config()
         self.mooring = 1
-        self._moorstr = f"NISKINe M{self.mooring}"
+        self.name = f"NISKINe M{self.mooring}"
         self.add_location_data()
         self.load_adcp()
         self.common_time_vector()
@@ -196,6 +196,7 @@ class OSNAPMooring(Mooring):
         cfg = niskine.io.load_config()
         self._osnap_data = cfg.data.input.osnap
         self._moorstr = moorstr
+        self.name = f"OSNAP {moorstr}"
         self.allfiles = self.get_osnap_mooring_files()
         self.adcpfiles = [fi for fi in self.allfiles if "ADCP" in fi.name]
         self.cmfiles = [fi for fi in self.allfiles if "CM" in fi.name]
