@@ -398,7 +398,9 @@ class OSNAPMooring(Mooring):
         """Interpolate CTD data to a common time vector."""
         nctd = []
         for ci in self.ctdlist:
-            nctd.append(ci.interp(time=self.time))
+            # xarray (2023.6.0) complains when using non-nanosecond precision
+            # in the interpolation
+            nctd.append(ci.interp(time=self.time.astype('datetime64[ns]')))
         self.ctd = xr.concat(nctd, dim="z")
         self.ctd = self.ctd.rename({"z": "nomz"})
         self.ctd = self.ctd.sortby("nomz")
@@ -407,7 +409,9 @@ class OSNAPMooring(Mooring):
         """Interpolate current meter data to a common time vector."""
         ncm = []
         for ci in self.cmlist:
-            ncm.append(ci.interp(time=self.time))
+            # xarray (2023.6.0) complains when using non-nanosecond precision
+            # in the interpolation
+            ncm.append(ci.interp(time=self.time.astype('datetime64[ns]')))
         self.cm = xr.concat(ncm, dim="z")
         self.cm = self.cm.rename({"z": "nomz"})
         self.cm = self.cm.sortby("nomz")
@@ -417,7 +421,9 @@ class OSNAPMooring(Mooring):
         # time interpolation
         nadcp = []
         for ci in self.adcplist:
-            nadcp.append(ci.interp(time=self.time))
+            # xarray (2023.6.0) complains when using non-nanosecond precision
+            # in the interpolation
+            nadcp.append(ci.interp(time=self.time.astype('datetime64[ns]')))
 
         # depth interpolation
         znew = np.arange(0, 810, 10)
@@ -446,9 +452,11 @@ class OSNAPMooring(Mooring):
                         Bi[ni], Vi[ni], bounds_error=False, fill_value=np.nan
                     )(znew)
 
+        # xarray (2023.6.0) complains when using non-nanosecond precision time
+        # here...
         adcp = xr.Dataset(
             data_vars={"u": (["time", "z"], ui), "v": (["time", "z"], vi)},
-            coords={"time": (["time"], self.time), "z": (["z"], znew)},
+            coords={"time": (["time"], self.time.astype('datetime64[ns]')), "z": (["z"], znew)},
         )
         self.adcp = adcp.transpose("z", "time")
 
