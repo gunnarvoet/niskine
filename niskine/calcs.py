@@ -129,11 +129,15 @@ class MixedLayerDepth:
         mpl.rcParams["lines.linewidth"] = 1
         gv.plot.helvetica()
 
+        # define blank out color (some gray...)
+        bc = "0.7"
+
         fig, ax = plt.subplots(
             nrows=4, ncols=1, figsize=(10, 7), constrained_layout=True, sharex=True
         )
 
         # SST
+        self.sst.sst.plot(color="w", zorder=5, ax=ax[0], linewidth=1.75)
         self.sst.sst.plot(color="C0", zorder=5, ax=ax[0])
         _data_array_annotate(
             ax[0], self.sst.sst, "2019-07-01", "SST", (-20, 13.5), color="C0"
@@ -145,8 +149,9 @@ class MixedLayerDepth:
             color="C0",
             alpha=0.3,
             zorder=4,
+            edgecolor=None,
         )
-        self.highest_temp.plot(ax=ax[0], color="0.7")
+        self.highest_temp.plot(ax=ax[0], color=bc)
         self.highest_temp.where(self.ssti - self.highest_temp < 1.5).plot(
             ax=ax[0], color="k"
         )
@@ -161,7 +166,7 @@ class MixedLayerDepth:
         ht = ax[0].set(ylabel="temperature [°C]")
 
         # knockdown
-        self.depth_shallowest.plot(ax=ax[1], yincrease=False, color="0.5")
+        self.depth_shallowest.plot(ax=ax[1], yincrease=False, color=bc)
         self.depth_shallowest.where(self.depth_shallowest < 100).plot(
             ax=ax[1], yincrease=False, color="k"
         )
@@ -175,12 +180,13 @@ class MixedLayerDepth:
         )
 
         # MLD with masks and Argo MLD climatology
-        self.mld.plot(ax=ax[2], color="0.5", yincrease=False)
+        self.mld.plot(ax=ax[2], color=bc, yincrease=False)
         self.mld.where(self.mask_sst & self.mask_knockdown).plot(ax=ax[2], color="k")
         _data_array_annotate(
             ax[2], self.mld, "2019-11-01", "MLD 0.2° criterion", (-45, 450), color="k"
         )
-        ax[2].plot(self.temp.time, self.argo_mld_i, color="C0", linewidth=1.5)
+        ax[2].plot(self.temp.time, self.argo_mld_i, color="w", linewidth=1.75)
+        ax[2].plot(self.temp.time, self.argo_mld_i, color="C0", linewidth=1.0)
         _data_array_annotate(
             ax[2],
             self.argo_mld_i,
