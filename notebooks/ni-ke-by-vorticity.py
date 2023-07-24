@@ -44,6 +44,7 @@ cfg = niskine.io.load_config()
 
 # %%
 gv.plot.helvetica()
+mpl.rcParams["lines.linewidth"] = 1
 
 # %% [markdown]
 # # NISKINe Plot Mean NI KE sorted by surface vorticity
@@ -88,9 +89,13 @@ maskna = (~np.isnan(ni_eke)).sum(dim="time") > 7e4
 (~np.isnan(ni_eke)).sum(dim="time").where(maskna).plot(yincrease=False, y="z")
 
 # %%
+mp = ni_eke.where(mask_pos & maskna).mean(dim="time")
+mn = ni_eke.where(mask_neg & maskna).mean(dim="time")
+
+# %%
 fig, ax = gv.plot.quickfig(h=5, w=4, grid=True)
-ni_eke.where(mask_pos & maskna).mean(dim="time").plot(ax=ax, y="z", yincrease=False, label=r"$\zeta/f > 0$")
-ni_eke.where(mask_neg & maskna).mean(dim="time").plot(ax=ax, y="z", yincrease=False, label=r"$\zeta/f < 0$")
+mp.plot(ax=ax, y="z", yincrease=False, label=r"$\zeta/f > 0$")
+mn.plot(ax=ax, y="z", yincrease=False, label=r"$\zeta/f < 0$")
 ax.legend()
 ax.set(title="M1 $\mathrm{KE}_\mathrm{NI}$", xlabel="$\mathrm{KE}_\mathrm{NI}$ [J/m$^3$]");
 niskine.io.png("m1_NI_KE_by_vorticity")
@@ -98,12 +103,59 @@ niskine.io.png("m1_NI_KE_by_vorticity")
 # %% [markdown]
 # How do we determine the uncertainty of this estimate? Obviously, the standard deviation contains lots of natural variability. Maybe we can use a bootstrap method and calculate the mean from randomly selected subsets?
 
+# %% [markdown]
+# Actually, the standard error is defined as $\pm\frac{\sigma}{\sqrt{n}}$ where $\sigma$ is the standard deviation and $n$ is the degrees of freedom in the dataset. For 95% confidence intervals this becomes $\pm1.96\, \frac{\sigma}{\sqrt{n}}$.
+
 # %%
-fig, ax = gv.plot.quickfig(h=5, w=4)
-ni_eke.where(mask_pos & maskna).std(dim="time").plot(ax=ax, y="z", yincrease=False, label=r"$\zeta/f > 0$")
-ni_eke.where(mask_neg & maskna).std(dim="time").plot(ax=ax, y="z", yincrease=False, label=r"$\zeta/f < 0$")
-ax.legend()
-ax.set(title="M1 std($\mathrm{KE}_\mathrm{NI}$)");
+(ni_eke.time[-1] - ni_eke.time[0]).data.astype('timedelta64[D]')
+
+# %%
+dof = 506 / 7
+print(dof)
+
+# %%
+mp_std = ni_eke.where(mask_pos & maskna).std(dim="time")
+mp_se = mp_std / np.sqrt(dof)
+mn_std = ni_eke.where(mask_neg & maskna).std(dim="time")
+mn_se = mn_std / np.sqrt(dof)
+
+# %% [markdown]
+# What is the decorrelation time scale? See below the autocorrelation plot of daily averaged NI EKE, it suggests a decorrelation time scale of about 10 days. At a length of 500 days we thus have $n=50$ degrees of freedom.
+
+# %%
+fig, ax = gv.plot.quickfig(h=5, w=4, grid=True)
+
+ax.fill_betweenx(mp.z, mp-1*mp_se, mp+1*mp_se, color="C3", alpha=0.2, edgecolor=None)
+ax.fill_betweenx(mn.z, mn-1*mn_se, mn+1*mn_se, color="C0", alpha=0.2, edgecolor=None)
+
+mp.plot(color="w", linewidth=2, ax=ax, y="z", yincrease=False)
+mp.plot(color="C3", ax=ax, y="z", yincrease=False, label=r"$\zeta/f > 0$")
+
+mn.plot(color="w", linewidth=2, ax=ax, y="z", yincrease=False)
+mn.plot(color="C0", ax=ax, y="z", yincrease=False, label=r"$\zeta/f < 0$")
+
+ax.legend(loc="center right")
+ax.set(title="M1 $\mathrm{KE}_\mathrm{NI}$", xlabel="$\mathrm{KE}_\mathrm{NI}$ [J/m$^3$]");
+niskine.io.png("m1_NI_KE_by_vorticity_with_1_standard_error")
+
+# %%
+fig, ax = gv.plot.quickfig(h=5, w=4, grid=True)
+
+ax.fill_betweenx(mp.z, mp-1.96*mp_se, mp+1.96*mp_se, color="C3", alpha=0.2, edgecolor=None)
+ax.fill_betweenx(mn.z, mn-1.95*mn_se, mn+1.95*mn_se, color="C0", alpha=0.2, edgecolor=None)
+
+mp.plot(color="w", linewidth=2, ax=ax, y="z", yincrease=False)
+mp.plot(color="C3", ax=ax, y="z", yincrease=False, label=r"$\zeta/f > 0$")
+
+mn.plot(color="w", linewidth=2, ax=ax, y="z", yincrease=False)
+mn.plot(color="C0", ax=ax, y="z", yincrease=False, label=r"$\zeta/f < 0$")
+
+ax.legend(loc="center right")
+ax.set(title="M1 $\mathrm{KE}_\mathrm{NI}$", xlabel="$\mathrm{KE}_\mathrm{NI}$ [J/m$^3$]");
+niskine.io.png("m1_NI_KE_by_vorticity_with_2_standard_error")
+
+# %% [markdown]
+# bootstrapping (not using this anymore)
 
 # %% [markdown]
 # Note: We possibly want to calculate daily averages first before bootstrapping, otherwise we still have so many of the same events. Or maybe even average over several days.
@@ -112,6 +164,11 @@ ax.set(title="M1 std($\mathrm{KE}_\mathrm{NI}$)");
 ni_eke_weekly = ni_eke.resample(time="7d").mean()
 ni_eke_daily = ni_eke.resample(time="d").mean()
 vorti_daily = vorti.resample(time="d").mean()
+
+# %%
+fig, ax = gv.plot.quickfig()
+ax.acorr(ni_eke_daily.sel(z=400, method="nearest"), usevlines=True, normed=True, maxlags=50, lw=1)
+ax.grid(True)
 
 
 # %%
