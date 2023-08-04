@@ -1,3 +1,4 @@
+# niskine config file
 path:
   # Path to output data - refer to as $data in entries below. This data
   # directory lives in the root directory given below (most likely where this

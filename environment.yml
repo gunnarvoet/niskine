@@ -2,7 +2,7 @@ name: niskine
 channels:
   - conda-forge
 dependencies:
-  - python=3.9
+  - python=3.10
   - black
   - mercurial   # for pulling pycurrents repo
   - matplotlib
@@ -31,6 +31,7 @@ dependencies:
   - pip:
     - jupytext
     - "-e git+https://github.com/gunnarvoet/gvpy.git#egg=gvpy"
+    - "-e git+https://github.com/modscripps/velosearaptor.git#egg=velosearaptor"
     - "hg+https://currents.soest.hawaii.edu/hgstage/pycurrents/#egg=pycurrents"
     # Install the local niskine package in developer mode
     - "-e ."
