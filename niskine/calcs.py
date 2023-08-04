@@ -481,6 +481,13 @@ def determine_ni_band(bandwidth, lat=None):
     return ni_band_period_long, ni_band_period_short
 
 
+def determine_m2_band(bandwidth):
+    t = 12.42
+    m2_band_period_long = bandwidth * t
+    m2_band_period_short = 1 / bandwidth * t
+    return m2_band_period_long, m2_band_period_short
+
+
 def bandpass_time_series(data, tlow, thigh, minlen=120, fs=1):
     """
     Band-pass filter time series data.

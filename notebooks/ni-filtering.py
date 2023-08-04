@@ -154,6 +154,44 @@ ax.set(xlabel="", ylabel="depth [m]", title="NI EKE M1", ylim=(1400, 0))
 gv.plot.concise_date(ax)
 
 # %%
+# load wind work
+wind_work = xr.open_dataarray(cfg.data.wind_work.niskine_m1)
+wind_work.close()
+wind_work_c = xr.open_dataarray(cfg.data.wind_work.niskine_m1_cumulative)
+wind_work_c.close()
+wind_stress = xr.open_dataarray(cfg.data.wind_work.niskine_m1_wind_stress)
+wind_stress.close()
+
+# load MLD
+mld = xr.open_dataarray(cfg.data.ml.mld)
+mld.close()
+
+# %%
+ni_eke = a.ni_eke
+mldi = mld.interp_like(ni_eke)
+mld_mask = ni_eke.z < mldi
+
+# %%
+(ni_eke.where(mld_mask).sum(dim="z") * 16).plot()
+
+# %%
+fig, ax = plt.subplots(nrows=4, ncols=1, figsize=(7.5, 8),
+                       constrained_layout=True, sharex=True)
+
+wind_work.plot(ax=ax[0])
+wind_work_c.plot(ax=ax[1])
+
+(a.ni_eke.sum(dim="z") * 16 / 1e3).plot(ax=ax[2])
+ax[2].set(ylabel="$\mathrm{EKE}_\mathrm{NI}$ [kJ/m$^2$]")
+
+(ni_eke.where(mld_mask).sum(dim="z") * 16 / 1e3).plot(ax=ax[3])
+gv.plot.concise_date(ax[3])
+ax[3].set(ylabel="$\mathrm{EKE}_\mathrm{NI} (ML)$ [kJ/m$^2$]")
+
+for axi in ax:
+    gv.plot.axstyle(axi, grid=True)
+
+# %%
 fig, ax = gv.plot.quickfig(w=8)
 h = (
     a2.ni_eke.resample(time="8h")

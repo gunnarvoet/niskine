@@ -235,6 +235,7 @@ def interpolate_seasonal_data(time, da):
     tmp = da.data
     timeax = 0 if da.shape[0] == 12 else 1
     assert da.dims[timeax] == "time"
+    assert len(da.time) == 12
     # We need to assemble the seasonal data into as many years as needed.
     if years > 1:
         tmp2 = np.concatenate([tmp, tmp], axis=timeax)
@@ -263,4 +264,3 @@ def get_wkb_factors(adcp):
     wkb = 1/np.sqrt(adcp.N/N0)
     wkb.name = "wkb normalization factor"
     return wkb
-    wkb.name = "wkb normalization"

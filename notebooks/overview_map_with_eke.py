@@ -157,7 +157,7 @@ def gl_format(ax):
 # %%
 fig = plt.figure(figsize=(20, 5))
 h = eke_climatology.plot(col='month', col_wrap=4, cmap='magma', cbar_kwargs={'shrink': 0.75})
-for i, ax in enumerate(h.axes.flatten()):
+for i, ax in enumerate(h.axs.flatten()):
     ss.plot.contour(levels=np.arange(-3000, 1000, 1000), colors='w', linestyles='-', linewidths=0.5, ax=ax)
     ax.set(xlabel='', ylabel='', title='month {}'.format(i+1))
 #     gl_format(ax)
@@ -310,6 +310,33 @@ for g, li in locs.groupby("mooring"):
         zorder=12,
         markersize=5,
     )
+# add location of OSNAP MM4
+mm4lat = 57.992698669433594
+mm4lon = -21.14349937438965
+ax.plot(
+    mm4lon,
+    mm4lat,
+    "ko",
+    transform=ccrs.PlateCarree(),
+    zorder=12,
+    markersize=5,
+)
+ax.annotate('OSNAP', xy=(mm4lon, mm4lat), xytext=(3, -7),
+         textcoords='offset points', ha='left', va='center',
+         color="k", fontweight="bold",
+         transform=ccrs.PlateCarree(),
+         zorder=12)
+    
+nislon = locs.sel(mooring=1).lon_actual
+nislat = locs.sel(mooring=1).lat_actual
+ax.annotate('NISKINE', xy=(nislon, nislat), xytext=(-3, 7),
+         textcoords='offset points', ha='right', va='center',
+         color="w", fontweight="bold",
+         transform=ccrs.PlateCarree(),
+         zorder=12)
+
+
+
 ax.set(title="")
 niskine.io.png("map_eke_mean")
 niskine.io.pdf("map_eke_mean")

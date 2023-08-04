@@ -135,6 +135,9 @@ ni_eke = xr.open_dataarray(cfg.data.ni_eke_m1)
 ni_eke.close()
 
 # %%
+ni_eke.mean(dim="time").plot(y="z", yincrease=False)
+
+# %%
 fig, ax = plt.subplots(nrows=6, ncols=1, figsize=(7.5, 7),
                        constrained_layout=True, sharex=True,
                        height_ratios=[1, 1, 1, 1, 1, 2.5])
@@ -252,7 +255,7 @@ if plot_fig:
     niskine.io.pdf(name)
 
 # %%
-fig, ax = plt.subplots(nrows=3, ncols=1, figsize=(8, 5.5),
+fig, ax = plt.subplots(nrows=3, ncols=1, figsize=(8, 5),
                        constrained_layout=True, sharex=True,
                        height_ratios=[1, 1, 1, ])
 
@@ -277,7 +280,7 @@ gv.plot.subplotlabel(ax, x=0.01, y=0.88)
 for axi in ax:
     gv.plot.axstyle(axi)
     axi.set(title="", xlabel="")
-gv.plot.concise_date_all()
+gv.plot.concise_date(ax[-1])
 
 plot_fig = True
 if plot_fig:

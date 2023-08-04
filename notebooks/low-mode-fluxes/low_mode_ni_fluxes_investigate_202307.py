@@ -43,113 +43,130 @@ cfg = niskine.io.load_config()
 gv.plot.helvetica()
 mpl.rcParams["lines.linewidth"] = 1
 
-# %% [markdown]
-# # NISKINe Low-Mode NI Wave Fluxes
-
-# %% [markdown]
-# This is a copy of `ni_fluxes_dev` so I can feel free to delete some older stuff.
-
-# %% [markdown]
-# Adapting the code I wrote for the OSNAP moorings to also work with NISKINe data.
-#
-# Currently this means bringing NISKINe M1 data into the same format as the OSNAP mooring data.
-
-# %% [markdown]
-# ## Method
-
-# %% [markdown]
-# In **Alford (2003)**, Matthew calculates near-inertial wave fluxes from mooring data based on mode fits. He uses only mode 1 and mode 2. His criteria for selecting mooring records are
-# - at least 4 instruments
-# - one instrument shallower than 800m
-# - deepest instrument more than 1000m from the bottom
-# - sampling interval faster than 3 hours
-# - water depth > 3200m
-# - record length > 180 days spanning at least one winter
-# - no excessive mooring motion measured as coherence between temperature and pressure
-#
-# Band-pass filtering with a 4th order Butterworth filter with center frequency $f$ and a band of $\{c^{-1}\omega, c\,\omega\}$ where the bandwidth parameter $c=1.25$. This is narrow enough to separate near-inertial from tidal signals for latitudes $|\lambda|<50^{\circ}$. We are at 58° with the OSNAP moorings, probably need to go to a narrower bandwidth. Or try to filter out tides.
-
 # %%
 gv.ocean.inertial_period(58);
 
 # %% [markdown]
-# Matthew uses climatological data to compute mean profiles of $T_z(z)$ and $N(z)$ at each mooring location. We could probably do better and use the Argo climatology to go with a seasonal cycle. Vertical displacements are calculated as
-# $$
-# \eta(z_j, t) = \frac{T(z_j, t)}{T_z(z_j)}
-# $$
-# where $T(z_j, t)$ is the band-passed temperature at depth $z_j$ and time $t$. Matthew makes an argument for the advection of horizontal gradients averaging out.
-
-# %% [markdown]
-# **Modes** only depend on $N(z)$. For low-frequency waves $(\omega\ll N)$ the modes are solutions to
-# $$
-# \frac{\partial^2}{\partial z^2} \eta_i(z) + c_i^{-2} N^2(z) \eta_i(z) = 0
-# $$
-# with boundary conditions $\eta(0)=\eta(H)=0$. $c_i$ is the eigenspeed of mode $i$. Modal expressions for velocity ($\vec{u}$), displacement ($\eta$) and pressure anomaly ($p^\prime$) are related to each other via the internal wave polarization relations.
-#
-# Full depth profiles of modal velocity, $\vec{u}_i(z, t)$, and displacement, $\eta_i(z, t)$, are obtained, for the first two modes, from the the band-passed time series $\vec{u}_j(z, t)$ and $\eta_j(z, t)$ at discrete depths $z_j$, by performing a least squares inverse at each time $t$. This gives time series of modal amplitude.
-
-# %% [markdown]
-# - Note: I don't quite understand whether we also do modal fits to velocity components or whether we can get those from the polarization relations. $\rightarrow$ Velocity and vertical displacement are projected onto the modes, but there are two sets of modes, one for vertical velocity and $\eta$, the other for horizontal velocity.
-
-# %% [markdown]
-# **Baroclinic pressure** is calculated by depth-integrating $N^2(z) \eta_i(z)$ and subtracting the mean, i.e. a pressure perturbation $p_i$ for each mode.
-
-# %% [markdown]
-# **Modal Energy Flux** is calculated as
-# $$F_i = \left< u_i p^\prime_i \right> ,$$ where ange brackets indicate averaging over a wave period. The energy flux is then integrated over the whole water column:
-# $$
-# \int_0^H F_i dz
-# $$
-# which has units of W/m.
-
-# %% [markdown]
-# ## Mooring Data Structures
+# # NISKINe Low-Mode NI Wave Fluxes
 
 # %% janus={"all_versions_showing": false, "cell_hidden": false, "current_version": 0, "id": "f9337f7b8cb73", "named_versions": [], "output_hidden": false, "show_versions": false, "source_hidden": false, "versions": []}
 os4 = niskine.mooring.OSNAPMooring(moorstr='UMM4')
 
 # %%
-os3 = niskine.mooring.OSNAPMooring(moorstr='UMM3')
-
-# %% [markdown]
-# This provides interpolated data in the attributes `adcp`, `cm` and `ctd`.
-
-# %%
-fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(4, 3),
+fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(2, 3),
                        constrained_layout=True, sharey=True)
-niskine.osnap.plot_mooring_setup(os3, ax=ax[0])
-niskine.osnap.plot_mooring_setup(os4, ax=ax[1])
-ax[0].invert_yaxis()
+niskine.osnap.plot_mooring_setup(os4, ax=ax)
+ax.invert_yaxis()
 
 # %%
-os4.adcp.u.gv.tcoarsen().gv.tplot()
-
-# %%
-fig, ax = gv.plot.quickfig()
-os4.ctd.p.plot(ax=ax, hue='nomz', add_legend=False)
-ax.set(xlabel="", ylim=[3000, 0], title="")
-gv.plot.concise_date(ax)
-
-# %% [markdown]
-# `MM3` only has one current meter at depth, but it has a complete record. We could probably fit the first mode. Note: We get really high fluxes at this mooring so maybe it doesn't work that well.
-
-# %% [markdown]
-# Here is the code for the OSNAP mooring structure ported to the niskine package and now based on an abstract base class.
-
-# %% [markdown]
-# The OSNAP dataset has everything interpolated to hourly values - that's probably a good idea for the NISKINe structure as well.
-
-# %% [markdown]
-# Since the code already works with the OSNAP mooring data structure we should bring the NISKINe data into the same format.
+O = niskine.flux.Flux(mooring=os4, bandwidth=1.05, runall=True)
 
 # %%
 m1 = niskine.mooring.NISKINeMooring()
 
 # %%
-m1
+N = niskine.flux.Flux(mooring=m1, bandwidth=1.05, runall=True, climatology="ARGO")
 
 # %%
-os3
+fig, ax = gv.plot.quickfig(yi=True, h=3)
+ax.plot(N.mooring.time, np.cumsum(N.Fu[:, 0])*3600/1e9, color='0.2')
+ax.plot(N.mooring.time, np.cumsum(np.sum(N.Fu, axis=1))*3600/1e9, label='F$_\mathregular{u}$')
+ax.plot(N.mooring.time, np.cumsum(N.Fv[:, 0])*3600/1e9, color='0.2')
+ax.plot(N.mooring.time, np.cumsum(np.sum(N.Fv, axis=1))*3600/1e9, label='F$_\mathregular{v}$')
+ax.set(ylabel=r'$\int \, \mathregular{F} \mathregular{dt}$ [GJ/m]',
+       title='NISKINe M1 Near-Inertial Energy Flux')
+ax.legend()
+gv.plot.concise_date()
+ax.grid()
+# niskine.io.png("niskine_m1_ni_low_mode_flux_all", subdir="low-mode-fluxes")
+
+# %% [markdown]
+# Check out modes based on Argo climatology:
+
+# %% [markdown]
+# These are time-mean vertical and horizontal modes
+
+# %%
+fig, ax = plt.subplots(ncols=2, sharex=True, sharey=True)
+h0 = N.modes.vmodes.mean(dim="time").plot(hue="mode", y="z", yincrease=False, ax=ax[0], )
+h1 = N.modes.hmodes.mean(dim="time").plot(hue="mode", y="z", yincrease=False, ax=ax[1], )
+
+# %% [markdown]
+# Here is the seasonal evolution of the modes
+
+# %%
+out = N.modes.vmodes.plot(col="mode", yincrease=False)
+for axi in out.axs[0]:
+    axi.set(xlabel="")
+# out.fig.suptitle("vmodes")
+
+# %%
+out = N.modes.hmodes.plot(col="mode", yincrease=False)
+for axi in out.axs[0]:
+    axi.set(xlabel="")
+
+# %%
+ax = N.Tz.gv.tplot(vmin=-0.03)
+
+# %%
+# # %%watch -p /Users/gunnar/Projects/niskine/niskine/niskine
+niskine.flux.plot_up_one_time_step(N, ti=6000)
+
+# %%
+# # %%watch -p /Users/gunnar/Projects/niskine/niskine/niskine
+niskine.flux.plot_eta_modes_one_time_step(N, 6000)
+
+# %%
+fig, ax = plt.subplots(nrows=4, ncols=1, figsize=(7.5, 5),
+                       constrained_layout=True, sharex=True)
+for axi, (g, ni) in zip(ax[:-1], N.up.groupby("mode")):
+    ni.gv.tplot(ax=axi, cmap="RdBu_r", vmin=-0.3, vmax=0.3)
+
+N.up.sum(dim="mode").gv.tplot(ax=ax[-1], cmap="RdBu_r", vmin=-0.5, vmax=0.5)
+
+# %%
+N.up.sum(dim="mode").gv.tplot(cmap="RdBu_r", )
+
+# %%
+N.pp.isel(mode=0).gv.tplot(cmap="RdBu_r")
+
+# %%
+fig, ax = plt.subplots(nrows=4, ncols=1, figsize=(7.5, 5),
+                       constrained_layout=True, sharex=True)
+for axi, (g, ni) in zip(ax[:-1], N.up.groupby("mode")):
+    ni.gv.tplot(ax=axi, cmap="RdBu_r", vmin=-0.3, vmax=0.3)
+
+N.up.sum(dim="mode").gv.tplot(ax=ax[-1], cmap="RdBu_r", vmin=-0.5, vmax=0.5)
+
+# %%
+
+# %% [markdown]
+# The mode fits for OSNAP look pretty okay, at least the ones for the horizontal or velocity modes.
+
+# %%
+# # %%watch -p /Users/gunnar/Projects/niskine/niskine/niskine
+niskine.flux.plot_up_one_time_step(O, ti=800)
+
+# %%
+# # %%watch -p /Users/gunnar/Projects/niskine/niskine/niskine
+niskine.flux.plot_eta_modes_one_time_step(O, 1000)
+
+# %%
+fig, ax = plt.subplots(nrows=4, ncols=1, figsize=(7.5, 5),
+                       constrained_layout=True, sharex=True)
+for axi, (g, ni) in zip(ax[:-1], O.up.groupby("mode")):
+    ni.gv.tplot(ax=axi, cmap="RdBu_r", vmin=-0.05, vmax=0.05)
+
+O.up.sum(dim="mode").gv.tplot(ax=ax[-1], cmap="RdBu_r", vmin=-0.1, vmax=0.1)
+
+# %%
+O.up.sum(dim="mode").gv.tplot(cmap="RdBu_r", )
+
+# %%
+
+# %%
+
+# %%
 
 # %% [markdown]
 # Pick a shorter time range for testing and development.
@@ -160,17 +177,20 @@ s = m1.shorten(slice("2020-03", "2020-04"))
 # %%
 s
 
-# %%
-ax = s.adcp.u.gv.tplot()
-
-# %%
-ax = s.ctd.th.gv.tplot()
-
 # %% [markdown]
 # Play with the NI flux calculation here. We use the shorter time series to speed things up a bit.
 
 # %%
 test = niskine.flux.Flux(mooring=s, bandwidth=1.03, runall=True, climatology="ARGO")
+
+# %%
+# test.background_gradients?
+
+# %%
+
+# %%
+
+# %%
 
 # %% [markdown]
 # Now that the flux calculation runs we want to make sure that the calculation is doing the right thing. Things to look for:
@@ -192,12 +212,6 @@ niskine.flux.plot_up_one_time_step(test, ti=1000)
 # %%
 # # %%watch -p /Users/gunnar/Projects/niskine/niskine/niskine
 niskine.flux.plot_eta_modes_one_time_step(test, 1000)
-
-# %%
-test.modes.vmodes.isel(mode=0).plot()
-
-# %%
-N.modes.vmodes.isel(mode=2).plot()
 
 # %%
 np.log10(N.N2s).plot()

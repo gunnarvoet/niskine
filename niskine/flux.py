@@ -4,6 +4,8 @@ Calculate NI fluxes.
 
 import numpy as np
 from matplotlib import ticker
+import matplotlib.colors as colors
+import matplotlib.pyplot as plt
 import xarray as xr
 from pathlib import Path
 import netCDF4
@@ -12,7 +14,6 @@ import warnings
 import gsw
 import gvpy as gv
 import scipy
-import matplotlib.pyplot as plt
 import pandas as pd
 
 import niskine
@@ -25,7 +26,7 @@ class Flux:
     Parameters
     ----------
     mooring : OSNAPMooring or NISKINeMooring
-        Mooring data generated with `mooring.OSNAPMooring()` or
+        Mooring data structure generated with `mooring.OSNAPMooring()` or
         `mooring.NISKINeMooring()`.
     bandwidth : float
         Bandwidth parameter
@@ -59,7 +60,7 @@ class Flux:
             self.flux_calcs()
 
     def __repr__(self):
-        return f"flux calculations for OSNAP mooring {self.mooring._moorstr}"
+        return f"flux calculations for mooring {self.mooring.name}"
 
     def band(self):
         t = gv.ocean.inertial_period(lat=self.mooring.lat) * 24
@@ -72,10 +73,10 @@ class Flux:
                 self.mooring.lon, self.mooring.lat, self.mooring.bottom_depth
             )
             # interpolate to mooring time vector
-            self.N2 = niskine.clim.interpolate_seasonal_data_to_mooring(
+            self.N2 = niskine.clim.interpolate_seasonal_data(
                 self.mooring.adcp.time, self.N2s
             )
-            self.Tz = niskine.clim.interpolate_seasonal_data_to_mooring(
+            self.Tz = niskine.clim.interpolate_seasonal_data(
                 self.mooring.adcp.time, self.Tzs
             )
         elif self.climatology == "WOCE":
@@ -134,7 +135,7 @@ class Flux:
                 ),
             },
             coords={
-                "time": (["time"], self.mooring.time),
+                "time": (["time"], self.mooring.time.data),
                 "mode": (
                     ["mode"],
                     self.modes.mode.data,
@@ -343,10 +344,11 @@ def calc_modes_seasonal(mooring, N2, nmodes=3):
     N2i = []
     assert N2.time.shape[0] == 12
     for g, Ni in N2.groupby("time"):
-        vmodes, hmodes, modes = calc_modes(mooring, Ni, nmodes=nmodes)
+        # vmodes, hmodes, modes = calc_modes(mooring, Ni, nmodes=nmodes)
+        modes = calc_modes(mooring, Ni, nmodes=nmodes)
         N2i.append(modes)
     modes = xr.concat(N2i, dim="time")
-    modes.coords["time"] = (["time"], N2.time)
+    modes.coords["time"] = (["time"], N2.time.data)
     modes = modes.transpose("z", "mode", "time")
     # now interpolate to mooring timestamps
     modes = interpolate_seasonal_modes_to_mooring(mooring, modes)
@@ -366,7 +368,7 @@ def project_eta_on_modes(mooring, modes, nmodes=3):
             zip(mooring.eta.groupby("time"), modes.groupby("time"))
         ):
             ni = np.flatnonzero(np.isfinite(etai))
-            beta_eta[i, :] = project_on_modes(
+            beta_eta[i, :] = project_on_vmodes(
                 etai.data[ni], etaz[ni], modei.vmodes.data, modei.z.data
             )
         # pack beta_hat into DataArray
@@ -391,7 +393,7 @@ def project_eta_on_modes(mooring, modes, nmodes=3):
     else:  # only one set of modes old (wrong?) method
         for i, (g, etai) in enumerate(mooring.eta.groupby("time")):
             ni = np.flatnonzero(np.isfinite(etai))
-            beta_eta[i, :] = project_on_modes(
+            beta_eta[i, :] = project_on_vmodes(
                 etai.data[ni], etaz[ni], modes.vmodes.data, modes.z.data
             )
         # pack beta_hat into DataArray
@@ -427,7 +429,7 @@ def beta_to_array(mooring, nmodes, beta):
     # modevec = np.append(modevec, 0)
     return xr.DataArray(
         beta,
-        coords={"time": (["time"], mooring.time), "mode": (["mode"], modevec)},
+        coords={"time": (["time"], mooring.time.data), "mode": (["mode"], modevec)},
         dims=["time", "mode"],
     )
 
@@ -466,10 +468,48 @@ def project_on_modes(data, dataz, modes, modesz):
     return beta_hat[:-1]
 
 
+def project_on_vmodes(data, dataz, modes, modesz):
+    """
+    Project observation onto mode shapes
+
+    Parameters
+    ----------
+    data : array_like
+        Vertical profile of data
+    dataz : array_like
+        Depth coordinate for data
+    modes : array_like (2D)
+        Matrix with modes
+    modesz : array_like
+        Depth coordinate for modes
+
+    Returns
+    -------
+    beta_hat
+        Modal amplitudes for given data profile
+
+    Notes
+    -----
+    Not returning last item of beta (the c in y = bx + c)
+    """
+    # interpolate mode to data depths
+    vme = interp1d(modesz, modes, bounds_error=False, axis=0)(dataz)
+    # solve
+    y = data
+    X = vme
+    # X = np.c_[X, np.ones(X.shape[0])]
+    beta_hat = np.linalg.lstsq(X, y, rcond=None)[0]
+    return beta_hat
+
+
 def downsample_adcp_data(adcp):
     print("warning - still need to write good code for downsampling adcp data")
-    zbins = np.arange(0, 1550, 50)
-    zbinlabels = np.arange(25, 1525, 50)
+    # print("currently averaging into 50m vertical bins")
+    # zbins = np.arange(0, 1550, 50)
+    # zbinlabels = np.arange(25, 1525, 50)
+    zbins = np.arange(0, 1600, 100)
+    zbinlabels = np.arange(50, 1550, 100)
+    print("currently averaging into 100m vertical bins")
     binbpu = adcp.bpu.groupby_bins("z", bins=zbins, labels=zbinlabels).mean()
     binbpv = adcp.bpv.groupby_bins("z", bins=zbins, labels=zbinlabels).mean()
     return binbpu, binbpv
@@ -641,15 +681,15 @@ def interpolate_seasonal_modes_to_mooring(mooring, modes):
     # vmodes
     vmodes = []
     for g, modei in modes.vmodes.groupby("mode"):
-        vmodes.append(interpolate_seasonal_data_to_mooring(mooring, modei))
+        vmodes.append(niskine.clim.interpolate_seasonal_data(mooring.time, modei))
     vmodes = xr.concat(vmodes, dim="mode")
-    vmodes.coords["mode"] = (["mode"], modes.mode)
+    vmodes.coords["mode"] = (["mode"], modes.mode.data)
     # hmodes
     hmodes = []
     for g, modei in modes.hmodes.groupby("mode"):
-        hmodes.append(interpolate_seasonal_data_to_mooring(mooring, modei))
+        hmodes.append(niskine.clim.interpolate_seasonal_data(mooring.time, modei))
     hmodes = xr.concat(hmodes, dim="mode")
-    hmodes.coords["mode"] = (["mode"], modes.mode)
+    hmodes.coords["mode"] = (["mode"], modes.mode.data)
     # combine
     modes_out = xr.Dataset({"vmodes": vmodes, "hmodes": hmodes})
     modes_out = modes_out.transpose("z", "mode", "time")
@@ -657,7 +697,6 @@ def interpolate_seasonal_modes_to_mooring(mooring, modes):
 
 
 def reconstruct_eta(flux):
-    print("warning - may not work for ARGO")
     nz = flux.N2.z.shape[0]
     nt = flux.mooring.time.shape[0]
     nmodes = flux.nmodes
@@ -675,12 +714,13 @@ def plot_eta_modes_time_series(flux):
     fig, ax = plt.subplots(
         nrows=2, ncols=1, figsize=(8, 6), constrained_layout=True, sharex=True
     )
+    opts = dict(vmin=-30, vmax=30, cmap="RdBu_r")
     etam.sum(dim="mode").plot(
-        y="z", yincrease=False, ax=ax[1], cbar_kwargs={"label": r"$\eta$ from modes"}
+        y="z", yincrease=False, ax=ax[1], cbar_kwargs={"label": r"$\eta$ from modes"}, **opts,
     )
     gv.plot.concise_date(ax[0])
     flux.mooring.eta.plot(
-        y="nomz", yincrease=False, ax=ax[0], cbar_kwargs={"label": r"$\eta$ observed"}
+        y="nomz", yincrease=False, ax=ax[0], cbar_kwargs={"label": r"$\eta$ observed"}, **opts,
     )
     gv.plot.concise_date(ax[1])
     ax[1].set(title="")
@@ -704,7 +744,7 @@ def plot_eta_modes_one_time_step(flux, ti, etam=None):
 
 
 def plot_up_modes_time_series(flux):
-    fig, ax = gv.plot.quickfig(h=3.5, w=6)
+    fig, ax = gv.plot.quickfig(h=3, w=9)
     flux.up.sum(dim="mode").plot(
         y="z",
         yincrease=False,
@@ -715,16 +755,145 @@ def plot_up_modes_time_series(flux):
 
 
 def plot_up_one_time_step(flux, ti):
-    binbpu, binbpv = downsample_adcp_data(flux.mooring.adcp)
-    u, z = combine_adcp_cm_one_timestep(flux.mooring, binbpu, binbpu.z_bins, ti)
-    fig, ax = gv.plot.quickfig(yi=False, w=4)
+    # binbpu, binbpv = downsample_adcp_data(flux.mooring.adcp)
+    u, z = combine_adcp_cm_one_timestep(flux.mooring, flux.binbpu, flux.binbpu.z_bins, ti)
+    fig, ax = gv.plot.quickfig(yi=False, w=3.5, grid=True)
+    # ax.set_prop_cycle(color=["C0", "C4", "C6"])
+    # ax.set_prop_cycle(color=["r", "b", "m"])
     ax.plot(u, z, "ko")
-    flux.up.isel(time=ti).plot(y="z", hue="mode")
-    flux.up.isel(time=ti).sum(dim="mode").plot(y="z", color="0.2")
+    for i, col in enumerate(["C0", "C4", "C6"]):
+        flux.up.isel(time=ti, mode=i).plot(y="z", color="w", linewidth=1.75)
+        flux.up.isel(time=ti, mode=i).plot(y="z", color=col, linewidth=1, label=f"mode {i+1}")
+    flux.up.isel(time=ti).sum(dim="mode").plot(y="z", color="w", linewidth=2)
+    flux.up.isel(time=ti).sum(dim="mode").plot(y="z", color="k", linewidth=1.5, label="$\sum$")
     gv.plot.xsym()
-    ax.grid()
-    ax.set(ylabel="depth [m]", xlabel="velocity [m/s]")
+    ax.set(ylabel="depth [m]", xlabel="eastward velocity [m/s]", title="")
+    ax.legend()
+    tstr = gv.time.datetime64_to_str(flux.mooring.time.isel(time=ti), unit="m").replace("T", "\n")
+    ax.annotate(tstr, (-0.03, 2900), ha="center", fontsize=9)
     ax.xaxis.set_major_locator(ticker.MaxNLocator(5))
+
+
+def plot_both_mode_fits_one_time_step(flux, ti):
+    fig, axx = plt.subplots(nrows=1, ncols=2, figsize=(7.5, 5),
+                       constrained_layout=True, sharey=True)
+    for axi in axx:
+        gv.plot.axstyle(axi, grid=True)
+
+    linecols = ["C0", "C4", "C6"]
+
+    # Plot velocity / horizontal modes
+    u, z = combine_adcp_cm_one_timestep(flux.mooring, flux.binbpu, flux.binbpu.z_bins, ti)
+    ax = axx[0]
+    ax.plot(u, z, linestyle="", marker="o", markersize=6, color="k", label="obs")
+    for i, col in enumerate(linecols):
+        flux.up.isel(time=ti, mode=i).plot(ax=ax, y="z", color="w", linewidth=2.5)
+        flux.up.isel(time=ti, mode=i).plot(ax=ax, y="z", color=col, linewidth=1.5, label=f"mode {i+1}")
+    flux.up.isel(time=ti).sum(dim="mode").plot(ax=ax, y="z", color="w", linewidth=2.5)
+    flux.up.isel(time=ti).sum(dim="mode").plot(ax=ax, y="z", color="k", linewidth=1.5, label="$\sum$")
+    gv.plot.xsym(ax=ax)
+    ax.set(ylabel="depth [m]", xlabel="eastward velocity u [m/s]", title="horizontal modes")
+    ax.legend(loc=(0.7, 0.3))
+    # ax.legend(loc="best")
+    tstr = gv.time.datetime64_to_str(flux.mooring.time.isel(time=ti), unit="m").replace("T", "\n")
+    # ax.annotate(tstr, (-0.015, 2900), ha="center", fontsize=9)
+    ax.annotate(tstr, (0.13, 0.03), ha="center", backgroundcolor="w", xycoords="axes fraction", fontsize=9)
+    ax.xaxis.set_major_locator(ticker.MaxNLocator(5))
+
+    # Plot velocity / horizontal modes
+    etam = reconstruct_eta(flux)
+    ax = axx[1]
+    flux.mooring.eta.isel(time=ti).plot(ax=ax, y="nomz", linestyle="", marker="o", markersize=6, color="k")
+    for i, col in enumerate(linecols):
+        etam.isel(time=ti, mode=i).plot(ax=ax, y="z", color="w", linewidth=2.5)
+        etam.isel(time=ti, mode=i).plot(ax=ax, y="z", color=col, linewidth=1.5)
+    etam.isel(time=ti).sum(dim="mode").plot(ax=ax, y="z", color="w", linewidth=2.5)
+    etam.isel(time=ti).sum(dim="mode").plot(ax=ax, y="z", color="k", linewidth=1.5)
+    gv.plot.xsym(ax=ax)
+    ax.set(ylabel="", xlabel="vertical displacement $\eta$ [m]", title="vertical modes")
+    ax.invert_yaxis()
+
+    gv.plot.subplotlabel(axx, fs=14, x=0.03, y=0.94)
+
+
+def plot_flux_time_series(ax, flux, add_legend=True, add_title=True):
+    time = flux.mooring.time
+    fu, fv = flux.Fu, flux.Fv
+    linecols = ["C0", "C4", "C6"]
+    for i, col in enumerate(linecols):
+        ax.plot(time, np.cumsum(fv.isel(mode=i))*3600/1e9, color="w", linestyle="-", linewidth=1.5)
+        ax.plot(time, np.cumsum(fv.isel(mode=i))*3600/1e9, color=col, linestyle="-", linewidth=0.75, label=f"mode {i+1}")
+        ax.plot(time, np.cumsum(fu.isel(mode=i))*3600/1e9, color="w", linestyle="-", linewidth=1.5)
+        ax.plot(time, np.cumsum(fu.isel(mode=i))*3600/1e9, color=col, linestyle="--", linewidth=0.75)
+
+    ax.plot(time, np.cumsum(np.sum(fv, axis=1))*3600/1e9, color="w", linestyle="-", linewidth=2)
+    ax.plot(time, np.cumsum(np.sum(fv, axis=1))*3600/1e9, color="k", linestyle="-", linewidth=1.0, alpha=1.0, label='F$_\mathregular{v}$')
+
+    ax.plot(time, np.cumsum(np.sum(fu, axis=1))*3600/1e9, color="w", linestyle="-", linewidth=2)
+    ax.plot(time, np.cumsum(np.sum(fu, axis=1))*3600/1e9, color="k", linestyle="--", alpha=1.0, linewidth=1.0, label='F$_\mathregular{u}$')
+
+    ax.set(ylabel=r'$\int \, \mathregular{F} \mathregular{dt}$ [GJ/m]')
+    if add_title:
+        ax.set(title=f'{flux.mooring.name} Near-Inertial Low-Mode Energy Flux')
+    if add_legend:
+        ax.legend()
+    gv.plot.concise_date()
+    ax.grid()
+
+
+def flux_mag_and_dir(flux):
+    Fu = flux.flux.fx_ni.sum(dim="mode")
+    Fv = flux.flux.fy_ni.sum(dim="mode")
+
+    Fuv = Fu + 1j * Fv
+
+    Fmag, Fdir = np.absolute(Fuv), np.angle(Fuv)
+    Fdir = Fdir - np.pi / 2
+    Fdir[Fdir < 0] = Fdir[Fdir < 0] + 2 * np.pi
+
+    Fmag.attrs["units"] = "W/m"
+    Fmag.attrs["long_name"] = "NI low-mode flux magnitude"
+
+    return Fmag, Fdir
+
+
+def plot_flux_polar(ax, flux):
+
+    Fu = flux.flux.fx_ni.sum(dim="mode")
+    Fv = flux.flux.fy_ni.sum(dim="mode")
+
+    mFu = Fu.mean(dim="time")
+    mFv = Fv.mean(dim="time")
+
+    Fuv = Fu + 1j * Fv
+    # Fuv = mFu + 1j * mFv
+    Fmag, Fdir = np.absolute(Fuv), np.angle(Fuv)
+    Fdir = Fdir - np.pi / 2
+    Fdir[Fdir < 0] = Fdir[Fdir < 0] + 2 * np.pi
+    delta_theta = 2 * np.pi / 48
+    _, _, _, h = ax.hist2d(
+        Fdir,
+        Fmag,
+        bins=[np.arange(0, 2 * np.pi + delta_theta, delta_theta), np.arange(0, 1250, 50)],
+        density=True,
+        cmap="RdPu",
+        # cmap="BuPu",
+        norm=colors.LogNorm(vmin=1e-5, vmax=3e-3),
+    )
+    plt.colorbar(h, label=r"PDF of F$_\mathregular{NI}$", shrink=0.5, pad=0.14)
+    ax.set_yticks([400, 800, 1200])
+    ax.set_yticklabels(["400 ", "800 ", "1200 W/m "], color="k", ha='left', va='bottom')
+    ax.set_rlabel_position(300)
+    ax.set_rmax(1200)
+    ax.set_xticks(np.arange(0, 2 * np.pi, np.pi / 2))
+    ax.set_xticklabels(["E", "S", "W", "N"])
+    ax.grid(which="major", axis="y", color="k")
+    ax.set(theta_direction=-1)
+    # mFuv = mFu + 1j * mFv
+    # mFmag, mFdir = np.absolute(mFuv), np.angle(mFuv)
+    # mFdir = mFdir - np.pi / 2
+    # mFdir = mFdir + 2 * np.pi if mFdir < 0 else mFdir
+    # ax.plot(mFdir, mFmag, 'wx');
 
 
 def _consec_blocks(idx=None, combine_gap=0, combine_run=0):

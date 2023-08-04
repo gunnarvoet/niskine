@@ -75,7 +75,14 @@ class Shortmooring:
         self.lon = mooring.lon
         self.lat = mooring.lat
         self.depth = mooring.depth
-        self.time = self.adcp.time.data
+        self.bottom_depth = mooring.depth
+        self.time = mooring.time.sel(time=timespan)
+
+    def __repr__(self):
+        t0 = gv.time.datetime64_to_str(self.time.data[0])
+        t1 = gv.time.datetime64_to_str(self.time.data[-1])
+        repr_str = f"shortened segement ({t0} to {t1}) of mooring data structure {self.name}"
+        return repr_str
 
 
 class NISKINeMooring(Mooring):
@@ -84,13 +91,17 @@ class NISKINeMooring(Mooring):
     Data interpolated in time and depth are in ctd, adcp, cm.
     """
 
-    def __init__(self):
+    def __init__(self, add_bottom_adcp=False, add_bottom_zero=False):
         self.cfg = niskine.io.load_config()
         self.mooring = 1
         self.name = f"NISKINe M{self.mooring}"
         self.add_location_data()
         self.load_adcp()
         self.common_time_vector()
+        if add_bottom_adcp:
+            self.load_near_bottom_adcp()
+        if add_bottom_zero:
+            self.bottom_zero()
         self.load_thermistor_data()
 
     def add_location_data(self):
@@ -109,6 +120,39 @@ class NISKINeMooring(Mooring):
         )
         self.adcp = self.adcp.transpose("z", "time", "adcp")
 
+    def load_near_bottom_adcp(self):
+        """Load near-bottom ADCP SN14408 that measured for a little more than a week.
+        Add as cm.
+        """
+        aa = xr.open_dataset(self.cfg.data.proc.adcp.joinpath("M1_14408.nc"))
+        aa.close()
+
+        u = aa.u.mean(dim="z")
+        v = aa.v.mean(dim="z")
+        u = u.interpolate_na(dim="time").dropna(dim="time")[1:]
+        v = v.interpolate_na(dim="time").dropna(dim="time")[1:]
+
+        # Bin-average to hourly values and interpolate to common time vector
+        u = u.resample(time="1H").mean()
+        u = u.interp(time=self.time.astype('datetime64[ns]'))
+        v = v.resample(time="1H").mean()
+        v = v.interp(time=self.time.astype('datetime64[ns]'))
+
+        cm = xr.Dataset(
+                data_vars=dict(u=(("time"), u.data), v=(("time"), v.data)),
+                coords=dict(time=(("time"), self.time.data))
+                )
+        cm = cm.expand_dims(dim="nomz")
+        cm.coords["nomz"] = (("nomz"), np.array([2830]))
+        cm["zz"] = (("nomz", "time"), np.ones_like(cm.u)*2830)
+        self.cm = cm
+
+    def bottom_zero(self):
+        cm = self.cm
+        cm.u.data = np.zeros_like(cm.u.data)
+        cm.v.data = np.zeros_like(cm.v.data)
+        self.cm = cm
+
     def load_thermistor_data(self):
         # t = xr.open_dataarray(self.cfg.data.gridded.temperature_10m_nc)
         t = xr.open_dataarray(self.cfg.data.gridded.temperature)
@@ -121,6 +165,7 @@ class NISKINeMooring(Mooring):
             "/Users/gunnar/Projects/niskine/data/NISKINe/Moorings/NISKINE19/M1/RBRSolo/proc/072174_20201010_0625.nc"
         )
         tdeep = tdeep.interp_like(t)
+        tdeep.data = np.zeros_like(tdeep.data)
         tdeep = tdeep.expand_dims("depth")
         # add depth of thermistor, determined via mean pressure record of CTD below.
         tdeep.coords["depth"] = np.array([2580])
@@ -146,22 +191,26 @@ class NISKINeMooring(Mooring):
         # )
 
         # Add deep SBE37
-        sbe37 = xr.open_dataset(
-            "/Users/gunnar/Projects/niskine/data/NISKINe/Moorings/NISKINE19/M1/SBE37/proc/SN12712/sbe37_12712_niskine.nc"
-        )
-        sbe37 = sbe37.where(sbe37.p > 2850, drop=True)
-        sbe37 = sbe37.interp_like(ctd.th)
-        sbe = xr.Dataset(
-            data_vars=dict(tt=sbe37.t, th=gsw.pt_from_CT(sbe37.SA, sbe37.CT))
-        )
-        sbe = sbe.expand_dims("z")
-        # add depth of CTD, determined via mean pressure record.
-        sbe.coords["z"] = np.array([2845])
-        self.ctd = xr.concat([ctd, sbe], dim="z").sortby("z")
+        # note: GV removing the time series as it may be affected by mooring
+        # motion and is not at a constant depth level.
+        # sbe37 = xr.open_dataset(
+        #     "/Users/gunnar/Projects/niskine/data/NISKINe/Moorings/NISKINE19/M1/SBE37/proc/SN12712/sbe37_12712_niskine.nc"
+        # )
+        # sbe37 = sbe37.where(sbe37.p > 2850, drop=True)
+        # sbe37 = sbe37.interp_like(ctd.th)
+        # sbe = xr.Dataset(
+        #     data_vars=dict(tt=sbe37.t, th=gsw.pt_from_CT(sbe37.SA, sbe37.CT))
+        # )
+        # sbe = sbe.expand_dims("z")
+        # # add depth of CTD, determined via mean pressure record.
+        # sbe.coords["z"] = np.array([2845])
+        # self.ctd = xr.concat([ctd, sbe], dim="z").sortby("z")
+        self.ctd = ctd
 
         # pick specific depths
-        znew = np.arange(50, 750, 50)
-        znew = np.append(znew, [830, 930, 1030, 1180, 1330, 2580, 2845])
+        znew = np.arange(50, 850, 100)
+        # znew = np.append(znew, [830, 930, 1030, 1180, 1330, 2580, 2845])
+        znew = np.append(znew, [830, 930, 1030, 1180, 1330, 2580,])
         self.ctd = self.ctd.sel(z=znew)
 
         # add coordinate nomz to match OSNAP mooring
@@ -173,7 +222,7 @@ class NISKINeMooring(Mooring):
         print("TODO: Use non-interpolated temperature")
 
     def common_time_vector(self):
-        self.time = self.adcp.time.data
+        self.time = self.adcp.time
 
 
 class OSNAPMooring(Mooring):
@@ -374,7 +423,9 @@ class OSNAPMooring(Mooring):
             self.tmax.append(ai.time.max().data)
         self.time_start = np.datetime64(np.min(self.tmin), "h")
         self.time_stop = np.datetime64(np.max(self.tmax), "h")
-        self.time = np.arange(self.time_start, self.time_stop, dtype="datetime64[h]")
+        time = np.arange(self.time_start, self.time_stop, dtype="datetime64[h]")
+        tt = xr.DataArray(time.astype('datetime64[ns]'), coords=dict(time=time.astype('datetime64[ns]')))
+        self.time = tt
 
     def get_position(self):
         """Add lon/lat as class attributes."""
@@ -457,7 +508,7 @@ class OSNAPMooring(Mooring):
         # here...
         adcp = xr.Dataset(
             data_vars={"u": (["time", "z"], ui), "v": (["time", "z"], vi)},
-            coords={"time": (["time"], self.time.astype('datetime64[ns]')), "z": (["z"], znew)},
+            coords={"time": (["time"], self.time.data), "z": (["z"], znew)},
         )
         self.adcp = adcp.transpose("z", "time")
 
