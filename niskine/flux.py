@@ -503,13 +503,9 @@ def project_on_vmodes(data, dataz, modes, modesz):
 
 
 def downsample_adcp_data(adcp):
-    print("warning - still need to write good code for downsampling adcp data")
-    # print("currently averaging into 50m vertical bins")
-    # zbins = np.arange(0, 1550, 50)
-    # zbinlabels = np.arange(25, 1525, 50)
     zbins = np.arange(0, 1600, 100)
     zbinlabels = np.arange(50, 1550, 100)
-    print("currently averaging into 100m vertical bins")
+    print("averaging ADCP data into 100m vertical bins")
     binbpu = adcp.bpu.groupby_bins("z", bins=zbins, labels=zbinlabels).mean()
     binbpv = adcp.bpv.groupby_bins("z", bins=zbins, labels=zbinlabels).mean()
     return binbpu, binbpv
