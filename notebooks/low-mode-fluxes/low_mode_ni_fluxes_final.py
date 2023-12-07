@@ -107,8 +107,8 @@ Omag.plot()
 # %%
 # # %%watch -p /Users/gunnar/Projects/niskine/niskine/niskine
 niskine.flux.plot_both_mode_fits_one_time_step(N, ti=6100)
-niskine.io.png("vel_mode_fit_example")
-niskine.io.pdf("vel_mode_fit_example")
+# niskine.io.png("vel_mode_fit_example")
+# niskine.io.pdf("vel_mode_fit_example")
 
 # %%
 # # %%watch -p /Users/gunnar/Projects/niskine/niskine/niskine
@@ -130,8 +130,6 @@ niskine.flux.plot_up_one_time_step(O, ti=3500)
 # %%
 # # %%watch -p /Users/gunnar/Projects/niskine/niskine/niskine
 niskine.flux.plot_eta_modes_one_time_step(O, ti=3500)
-
-# %%
 
 # %% [markdown]
 # ## Plot flux time series and seasonal mean
@@ -179,8 +177,13 @@ ax[0].set(ylim=(-0.6, 0.2))
 # ax[0].set(ylim=(-1.4, 0.9))
 ax[1].set(ylim=(-1.4, 0.9))
 
-gv.plot.annotate_upper_left("NISKINE M1", ax=ax[0])
-gv.plot.annotate_upper_left("OSNAP MM4", ax=ax[1])
+gv.plot.annotate_corner("c", ax=ax[0], quadrant=1, fs=13, background_circle=True, addy=0.05, fw="bold")
+gv.plot.annotate_corner("NISKINE M1", ax=ax[0], quadrant=2, fs=13, text_bg="w")
+gv.plot.annotate_corner("d", ax=pax1, quadrant=1, fs=13, background_circle=True, addx=-0.05, addy=0.05)
+
+gv.plot.annotate_corner("e", ax=ax[1], quadrant=1, fs=13, background_circle=True, addy=0.05)
+gv.plot.annotate_corner("OSNAP MM4", ax=ax[1], quadrant=2, fs=12, text_bg="w")
+gv.plot.annotate_corner("f", ax=pax2, quadrant=1, fs=13, background_circle=True, addx=-0.05, addy=0.05)
 
 ax[0].set(xlim=(np.datetime64("2019-05-01"), np.datetime64("2021-06-01")))
 ax[1].set(xlim=(np.datetime64("2014-05-01"), np.datetime64("2016-06-01")))
@@ -191,3 +194,5 @@ niskine.flux.plot_flux_polar(pax2, O)
 
 niskine.io.png("low_mode_fluxes")
 niskine.io.pdf("low_mode_fluxes")
+
+# %%

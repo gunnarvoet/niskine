@@ -29,7 +29,9 @@ dependencies:
   - motuclient
   - pip
   - pip:
+    - argopy
     - jupytext
+    - palettable
     - "-e git+https://github.com/gunnarvoet/gvpy.git#egg=gvpy"
     - "-e git+https://github.com/modscripps/velosearaptor.git#egg=velosearaptor"
     - "hg+https://currents.soest.hawaii.edu/hgstage/pycurrents/#egg=pycurrents"

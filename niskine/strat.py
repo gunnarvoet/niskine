@@ -379,7 +379,7 @@ def gather_pressure_time_series(common_time=None):
         timeslice = niskine.io.mooring_start_end_time(mooring=1)
         common_time = np.arange(
             timeslice.start, timeslice.stop, dtype="datetime64[20m]"
-        ).astype("datetime64[m]")
+        ).astype("datetime64[ns]")
     # microcats
     s = niskine.io.read_microcats(common_time=common_time)
     sp = s.p

@@ -33,6 +33,7 @@ data:
     osnap: $data/gridded/osnap/
     # gridded thermistor data
     temperature: $data/gridded/temperature/t_10m_2min.nc
+    temperature_thermistor_2min: $data/gridded/temperature/thermistor_time_series_2min.nc
     # gridded thermistor data from Anna
     temperature_10m_mat: $data/input/temperature/InterpolatedM1_10mBins.mat
     temperature_mat: $data/input/temperature/M1Temperature.mat
@@ -48,6 +49,7 @@ data:
 
   wind_work:
     niskine_m1: $data/wind_work/ni_wind_work_niskine_m1.nc
+    niskine_m1_mode1: $data/wind_work/ni_wind_work_niskine_m1_mode1.nc
     niskine_m1_cumulative: $data/wind_work/ni_wind_work_niskine_m1_integrated.nc
     niskine_m1_wind_stress: $data/wind_work/wind_stress_niskine_m1.nc
     osnap_umm3: $data/wind_work/ni_wind_work_osnap_umm3.nc
@@ -74,3 +76,5 @@ data:
 mooring_locations: $data/niskine_mooring_locations.nc
 
 m1_sensor_config: $data/m1_sensor_distribution.csv
+
+em_float_locations: $data/em-float/fllog7806

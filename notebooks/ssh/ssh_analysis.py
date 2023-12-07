@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.0
+#       jupytext_version: 1.15.2
 #   kernelspec:
 #     display_name: Python [conda env:niskine]
 #     language: python
@@ -62,26 +62,33 @@ m1lat = locs.sel(mooring=1).lat_actual.item()
 # %% [markdown]
 # I am still not 100% sure whether to use absolute geostrophic velocities or geostrophic velocity anomalies when calculating eddy kinetic energy and vorticity. I am super convinced though that it should be the anomalies, they are referenced to the [1993, 2012] period and thus calculated in the same way as sea level anomalies (`sla`).
 
-# %% [markdown] heading_collapsed=true
+# %% [markdown]
 # ### Load Data
 
-# %% hidden=true
+# %%
 alt = niskine.io.load_ssh()
 
-# %% hidden=true
+# %%
 # we could also load hourly data (but don't have those for the whole time series)
 # ssh = niskine.io.load_ssh(hourly=True)
 
-# %% [markdown] hidden=true
+# %% [markdown]
+# Resolution in lat/lon:
+
+# %%
+print(alt.lat.diff(dim="lat").isel(lat=0).item())
+print(alt.lon.diff(dim="lon").isel(lon=0).item())
+
+# %% [markdown]
 # Load Smith & Sandwell
 
-# %% hidden=true
+# %%
 ss = gv.ocean.smith_sandwell(lon=alt.lon, lat=alt.lat)
 
-# %% [markdown] heading_collapsed=true
+# %% [markdown]
 # ### Calculate EKE
 
-# %% hidden=true
+# %%
 alt['eke'] = 1/2 * (alt.ugosa**2 + alt.vgosa**2)
 
 # %% [markdown]
@@ -157,11 +164,92 @@ m2eke = alt.eke.interp(lon=locs.sel(mooring=2).lon_actual, lat=locs.sel(mooring=
 m3vort = vort.interp(lon=locs.sel(mooring=3).lon_actual, lat=locs.sel(mooring=3).lat_actual)
 m3eke = alt.eke.interp(lon=locs.sel(mooring=3).lon_actual, lat=locs.sel(mooring=3).lat_actual)
 
+# %% [markdown]
+# Also interpolate to OSNAP MM4.
+
+# %%
+mm4lat = 57.992698669433594
+mm4lon = -21.14349937438965
+mm4vort = vort.interp(lon=mm4lon, lat=mm4lat)
+mm4eke = alt.eke.interp(lon=mm4lon, lat=mm4lat)
+
 # %%
 ax = m1vort.sel(time=slice("2019-05", "2020-10")).gv.tplot(label="M1")
 ax = m2vort.sel(time=slice("2019-05", "2020-10")).gv.tplot(ax=ax, label="M2")
 ax = m3vort.sel(time=slice("2019-05", "2020-10")).gv.tplot(ax=ax, label="M3")
 ax.legend()
+
+# %% [markdown]
+# We see northward low-mode flux at OSNAP MM4 in early 2016. Is there something in the vorticity?
+
+# %%
+ax = mm4vort.sel(time=slice("2014-07", "2016-07")).gv.tplot()
+
+# %%
+print(mm4vort.sel(time=slice("2015-01", "2015-03")).mean().item())
+print(mm4vort.sel(time=slice("2016-01", "2016-03")).mean().item())
+
+# %%
+ax = mm4vort.sel(time=slice("2015-01", "2015-03")).gv.tplot()
+ax = mm4vort.sel(time=slice("2016-01", "2016-03")).gv.tplot(ax=ax)
+
+# %%
+fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(7.5, 5),
+                       constrained_layout=True)
+
+vort.sel(time=slice("2015-01", "2015-03")).mean(dim="time").plot(ax=ax[0], cbar_kwargs=dict(label="$\zeta/f$", aspect=30, shrink=0.7, orientation="horizontal"), vmin=0.3, vmax=-0.3, cmap="RdBu_r")
+ax[0].set(title="Jan-Mar 2015")
+
+vort.sel(time=slice("2016-01", "2016-03")).mean(dim="time").plot(ax=ax[1], cbar_kwargs=dict(label="$\zeta/f$", aspect=30, shrink=0.7, orientation="horizontal"), vmin=0.3, vmax=-0.3, cmap="RdBu_r")
+ax[1].set(title="Jan-Mar 2016")
+
+
+for axi in ax:
+    axi.plot(mm4lon, mm4lat, "kx")
+    axi.annotate("OSNAP\nMM4", xy=(mm4lon, mm4lat), xytext=(10, -30), textcoords="offset points")
+    axi.set(xlabel="", ylabel="")
+niskine.io.png("OSNAP_winter_average_vorticity")
+
+# %% [markdown]
+# Look at meridional gradients
+
+# %%
+fig, ax = gv.plot.quickfig()
+vort.sel(time=slice("2015-01", "2015-03")).sel(lon=mm4lon, method="nearest").sel(lat=slice(mm4lat, mm4lat+1)).plot(x="time", ax=ax, cbar_kwargs=dict(label="$\zeta/f$", aspect=30, shrink=0.7, orientation="horizontal"), vmin=0.3, vmax=-0.3, cmap="RdBu_r")
+
+# %%
+fig, ax = gv.plot.quickfig()
+vort.sel(time=slice("2016-01", "2016-03")).sel(lon=mm4lon, method="nearest").sel(lat=slice(mm4lat, mm4lat+1)).plot(x="time", ax=ax, cbar_kwargs=dict(label="$\zeta/f$", aspect=30, shrink=0.7, orientation="horizontal"), vmin=0.3, vmax=-0.3, cmap="RdBu_r")
+
+# %%
+mean_2016 = vort.sel(time=slice("2016-01", "2016-03")).sel(lon=mm4lon, method="nearest").sel(lat=slice(mm4lat, mm4lat+1)).mean(dim="time")
+
+# %%
+vdiff = np.diff(mean_2016.data[[0, -1]])
+
+# %%
+vdiff
+
+# %%
+dist = gsw.distance(lon=np.tile(mean_2016.lon.data, 2), lat=mean_2016.lat[[0, -1]]) * 1e3
+
+# %%
+dist
+
+# %%
+vort_grad = (vdiff/dist).item()
+
+# %%
+vort_grad
+
+# %%
+beta = gv.ocean.beta(mm4lat)
+
+# %%
+beta
+
+# %%
+vort_grad / beta
 
 # %%
 fig, ax = gv.plot.quickfig()
@@ -207,13 +295,36 @@ ax.set(xlim=(-25, -18), ylim=(56, 62))
 
 # %%
 mean_vort_niskine = vort.sel(time=slice("2019-05", "2020-10")).mean(dim="time")
-mean_vort_niskine.interp(lon=locs.lon_actual, lat=locs.lat_actual)
+mean_vort_niskine_at_moorings = mean_vort_niskine.interp(lon=locs.lon_actual, lat=locs.lat_actual)
+
+# %%
+mean_vort_niskine_at_moorings
 
 # %%
 fig, ax = gv.plot.quickfig()
 mean_vort_niskine.plot(cbar_kwargs=dict(label="$\zeta/f$", aspect=30, shrink=0.7), vmin=0.03, vmax=-0.03, cmap="RdBu_r")
 ax.plot(locs.lon_actual, locs.lat_actual, "kx")
 ax.set(xlim=(-25, -18), ylim=(56, 62))
+
+# %% [markdown]
+# Compare vorticity gradients between moorings with $\beta$. Let's focus on the M1 - M2 difference. I think here we want to calculate the lateral vorticity gradient from absolute vorticity, not relative to f.
+
+# %%
+dist = gsw.distance(lon=locs.lon_actual[:-1], lat=locs.lat_actual[:-1])
+
+# %%
+vdiff = mean_vort_niskinem_at_moorings[:-1].diff(dim="mooring") * f
+
+# %%
+vort_grad = (-vdiff/dist).item()
+
+# %%
+beta = gv.ocean.beta(locs.lat_actual.mean().data)
+
+# %%
+print(vort_grad)
+print(beta)
+print(vort_grad/beta)
 
 # %% [markdown]
 # ### Monthly Mean EKE

@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.0
+#       jupytext_version: 1.15.2
 #   kernelspec:
 #     display_name: Python [conda env:niskine]
 #     language: python
@@ -110,6 +110,27 @@ wind = xr.open_dataset(cfg.data.wind.era5)
 N = niskine.calcs.NIWindWorkNiskine()
 Nc = niskine.calcs.NIWindWorkNiskine(apply_current_feedback_correction=False)
 
+# %% [markdown]
+# Does it matter whether we use the full spectrum wind stress or just the near-inertial wind-stress? For the instantaneous wind work - yes!
+
+# %%
+test = N.taux * N.u_ocean_ni + N.tauy * N.v_ocean_ni
+
+fig, ax = gv.plot.quickfig()
+ax = test.gv.plot(ax=ax)
+ax = N.wind_work.gv.plot(ax=ax)
+
+
+# %% [markdown]
+# But not for the cumulative wind work. I guess this makes sense as using near-inertial velocity in the calculation is basically a filter for the full-spectrum wind stress.
+
+# %%
+ax = N.wind_work_int.gv.plot()
+(test * 3.6e3 / 1e3).cumsum(dim="time").gv.plot(ax=ax)
+
+# %% [markdown]
+# See how much the feedback correction matters:
+
 # %%
 fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(6.5, 4),
                        constrained_layout=True)
@@ -123,10 +144,7 @@ niskine.io.png('cumulative_wind_work_niskine_m1', subdir='wind-work')
 niskine.io.pdf('cumulative_wind_work_niskine_m1', subdir='wind-work')
 
 # %% [markdown]
-# Plot ocean velocity, wind stress, and air-sea energy flux for one component
-
-# %%
-np.sqrt(N.taux**2 + N.tauy**2).plot(linewidth=1)
+# Plot NI velocity, NI wind stress, and NI energy flux.
 
 # %%
 fig, ax = plt.subplots(nrows=3, ncols=1, figsize=(7, 5),
@@ -148,18 +166,56 @@ niskine.io.png('wind_work_niskine_m1', subdir='wind-work')
 niskine.io.pdf('wind_work_niskine_m1', subdir='wind-work')
 
 # %% [markdown]
+# Let's low-pass filter NI wind work for a clearer presentation.
+
+# %%
+lp_period_hours = 18
+ww_lp = N.wind_work.copy()
+tmp = niskine.calcs.lowpass_time_series(N.wind_work, lp_period_hours, fs=1)
+ww_lp.data = tmp
+
+# Integrate in time
+ww_lp_int = (ww_lp * 3.6e3 / 1e3).cumsum(
+    dim="time",
+)
+fig, ax = gv.plot.quickfig(grid=True, fgs=(5,3))
+(N.wind_work * 1e3).plot(ax=ax, color="k", linewidth=1, label="wind work")
+# (ww_lp * 1e3).plot(ax=ax, color="w", linewidth=2)
+(ww_lp * 1e3).plot(ax=ax, color="C6", linewidth=1, label="wind work lp")
+ax.set(title="", ylabel="NI wind work [mW m$^{-2}$]")
+ax.legend()
+gv.plot.concise_date(ax)
+niskine.io.png("wind_work_lp", subdir="wind-work")
+
+# %% [markdown]
+# Low-pass filtering does not matter for the effective forcing: the difference in cumulative (time-integrated) wind work is negligible.
+
+# %%
+fig, ax = gv.plot.quickfig(grid=True, fgs=(5,3))
+(N.wind_work_int - ww_lp_int).plot(ax=ax)
+gv.plot.concise_date(ax)
+
+# %% [markdown]
+# Deployment-average wind work.
+
+# %%
+N.wind_work.mean(dim="time").data
+
+# %% [markdown]
+# What is the annual mean NI wind work? Cut time series to one year.
+
+# %%
+N.wind_work.where(N.wind_work.time<np.datetime64("2020-05-17"), drop=True).mean(dim="time").data
+
+# %% [markdown]
 # Save Results
 
 # %%
-cfg.data.wind_work.niskine_m1.as_posix()
-
-# %%
+# wind work
 N.wind_work.to_netcdf(cfg.data.wind_work.niskine_m1.as_posix())
-
-# %%
+# cumulative wind work
 N.wind_work_int.to_netcdf(cfg.data.wind_work.niskine_m1_cumulative.as_posix())
-
-# %%
+# wind stress
 np.sqrt(N.taux**2 + N.tauy**2).to_netcdf(cfg.data.wind_work.niskine_m1_wind_stress)
 
 # %% [markdown]

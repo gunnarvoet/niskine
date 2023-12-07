@@ -7,7 +7,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.0
+#       jupytext_version: 1.15.1
 #   kernelspec:
 #     display_name: Python [conda env:niskine]
 #     language: python
@@ -18,7 +18,6 @@
 # #### Imports
 
 # %%
-
 # %matplotlib inline
 from pathlib import Path
 import matplotlib.pyplot as plt
@@ -68,6 +67,11 @@ print(timeslice.start, "  --  ", timeslice.stop)
 # %%
 common_time = np.arange(timeslice.start, timeslice.stop, dtype="datetime64[20m]").astype(
     "datetime64[m]"
+)
+
+# %%
+common_time = np.arange(timeslice.start, timeslice.stop, dtype="datetime64[20m]").astype(
+    "datetime64[ns]"
 )
 
 # %% [markdown]
@@ -433,9 +437,6 @@ tempz = zzt.interp(time=temp.time.data).swap_dims(sn="nomz")
 
 
 temp.coords["zz"] = (("nomz", "time"), tempz.data)
-
-# %%
-temp
 
 # %%
 fig, ax = gv.plot.quickfig()

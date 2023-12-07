@@ -43,12 +43,13 @@ class Flux:
     """
 
     def __init__(
-        self, mooring, bandwidth, nmodes=3, type="NI", climatology="WOCE", runall=True
+        self, mooring, bandwidth, nmodes=3, type="NI", climatology="WOCE", runall=True, adcp_vertical_resolution=100,
     ):
         self.mooring = mooring
         self.bandwidth = bandwidth
         self.climatology = climatology
         self.nmodes = nmodes
+        self.adcp_vertical_resolution = adcp_vertical_resolution
         self.band()
         if runall:
             self.background_gradients()
@@ -106,7 +107,7 @@ class Flux:
         )
 
     def vel_modes(self):
-        self.binbpu, self.binbpv = downsample_adcp_data(self.mooring.adcp)
+        self.binbpu, self.binbpv = downsample_adcp_data(self.mooring.adcp, self.adcp_vertical_resolution)
         self.beta_u, self.beta_v = project_vels_on_modes(
             self.mooring, self.binbpu, self.binbpv, self.modes, nmodes=self.nmodes
         )
@@ -329,13 +330,18 @@ def calc_modes(mooring, N2, nmodes=3):
     Vert, Hori, Edep, PVel = gv.ocean.vmodes(z, N, clat, calcmodes)
     vmodes = Vert[:, 1:calcmodes]
     hmodes = Hori[:, 1:calcmodes]
+    eigenspeed = PVel[1:calcmodes]
+    equivalent_depth = Edep[1:calcmodes]
     modes = xr.Dataset(
         data_vars={
             "vmodes": (["z", "mode"], vmodes),
             "hmodes": (["z", "mode"], hmodes),
+            "eigenspeed": (["mode"], eigenspeed),
+            "equivalent_depth": (["mode"], equivalent_depth),
         },
         coords={"z": (["z"], N2.z.data), "mode": (["mode"], np.arange(1, calcmodes))},
     )
+    modes.eigenspeed.attrs = dict(long_name='eigenspeed $c_n$', units='m/s')
     return modes
 
 
@@ -502,10 +508,10 @@ def project_on_vmodes(data, dataz, modes, modesz):
     return beta_hat
 
 
-def downsample_adcp_data(adcp):
-    zbins = np.arange(0, 1600, 100)
-    zbinlabels = np.arange(50, 1550, 100)
-    print("averaging ADCP data into 100m vertical bins")
+def downsample_adcp_data(adcp, vertical_resolution=100):
+    zbins = np.arange(0, 1500 + vertical_resolution, vertical_resolution)
+    zbinlabels = np.arange(vertical_resolution / 2, 1500 + vertical_resolution / 2, vertical_resolution)
+    print(f"averaging ADCP data into {vertical_resolution}m vertical bins")
     binbpu = adcp.bpu.groupby_bins("z", bins=zbins, labels=zbinlabels).mean()
     binbpv = adcp.bpv.groupby_bins("z", bins=zbins, labels=zbinlabels).mean()
     return binbpu, binbpv
@@ -686,9 +692,22 @@ def interpolate_seasonal_modes_to_mooring(mooring, modes):
         hmodes.append(niskine.clim.interpolate_seasonal_data(mooring.time, modei))
     hmodes = xr.concat(hmodes, dim="mode")
     hmodes.coords["mode"] = (["mode"], modes.mode.data)
+    # eigenspeed
+    eigenspeed = []
+    for g, modei in modes.eigenspeed.groupby("mode"):
+        eigenspeed.append(niskine.clim.interpolate_seasonal_data(mooring.time, modei))
+    eigenspeed = xr.concat(eigenspeed, dim="mode")
+    eigenspeed.coords["mode"] = (["mode"], modes.mode.data)
+    # equivalent depth
+    equivalent_depth = []
+    for g, modei in modes.equivalent_depth.groupby("mode"):
+        equivalent_depth.append(niskine.clim.interpolate_seasonal_data(mooring.time, modei))
+    equivalent_depth = xr.concat(equivalent_depth, dim="mode")
+    equivalent_depth.coords["mode"] = (["mode"], modes.mode.data)
     # combine
-    modes_out = xr.Dataset({"vmodes": vmodes, "hmodes": hmodes})
+    modes_out = xr.Dataset({"vmodes": vmodes, "hmodes": hmodes, "eigenspeed": eigenspeed, "equivalent_depth": equivalent_depth})
     modes_out = modes_out.transpose("z", "mode", "time")
+    modes_out.eigenspeed.attrs = dict(long_name='eigenspeed $c_n$', units='m/s')
     return modes_out
 
 
@@ -750,16 +769,21 @@ def plot_up_modes_time_series(flux):
     ax.set(xlabel="")
 
 
-def plot_up_one_time_step(flux, ti):
-    # binbpu, binbpv = downsample_adcp_data(flux.mooring.adcp)
+def plot_up_one_time_step(flux, ti, nmodes=3):
     u, z = combine_adcp_cm_one_timestep(flux.mooring, flux.binbpu, flux.binbpu.z_bins, ti)
+
     fig, ax = gv.plot.quickfig(yi=False, w=3.5, grid=True)
-    # ax.set_prop_cycle(color=["C0", "C4", "C6"])
-    # ax.set_prop_cycle(color=["r", "b", "m"])
     ax.plot(u, z, "ko")
-    for i, col in enumerate(["C0", "C4", "C6"]):
-        flux.up.isel(time=ti, mode=i).plot(y="z", color="w", linewidth=1.75)
-        flux.up.isel(time=ti, mode=i).plot(y="z", color=col, linewidth=1, label=f"mode {i+1}")
+
+    if nmodes == 3:
+        for i, col in enumerate(["C0", "C4", "C6"]):
+            flux.up.isel(time=ti, mode=i).plot(y="z", color="w", linewidth=1.75)
+            flux.up.isel(time=ti, mode=i).plot(y="z", color=col, linewidth=1, label=f"mode {i+1}")
+    else:
+        for i in range(nmodes):
+            flux.up.isel(time=ti, mode=i).plot(y="z", color="w", linewidth=1.75)
+            flux.up.isel(time=ti, mode=i).plot(y="z", linewidth=1, label=f"mode {i+1}")
+
     flux.up.isel(time=ti).sum(dim="mode").plot(y="z", color="w", linewidth=2)
     flux.up.isel(time=ti).sum(dim="mode").plot(y="z", color="k", linewidth=1.5, label="$\sum$")
     gv.plot.xsym()
@@ -782,6 +806,12 @@ def plot_both_mode_fits_one_time_step(flux, ti):
     u, z = combine_adcp_cm_one_timestep(flux.mooring, flux.binbpu, flux.binbpu.z_bins, ti)
     ax = axx[0]
     ax.plot(u, z, linestyle="", marker="o", markersize=6, color="k", label="obs")
+    # plot the deep constraint in gray
+    ax.plot(u[-1], z[-1], linestyle="", marker="o", markersize=6, mec="k", mfc="w")
+    ax.annotate("zero\nconstraint", xy=(u[-1], z[-1]), xytext=(-0.017, z[-1]-650),
+                color="0.3", xycoords="data", ha="center", va="top", backgroundcolor="w",
+                arrowprops=dict(color="0.3", arrowstyle="->", shrinkB=7)
+                )
     for i, col in enumerate(linecols):
         flux.up.isel(time=ti, mode=i).plot(ax=ax, y="z", color="w", linewidth=2.5)
         flux.up.isel(time=ti, mode=i).plot(ax=ax, y="z", color=col, linewidth=1.5, label=f"mode {i+1}")
@@ -796,7 +826,7 @@ def plot_both_mode_fits_one_time_step(flux, ti):
     ax.annotate(tstr, (0.13, 0.03), ha="center", backgroundcolor="w", xycoords="axes fraction", fontsize=9)
     ax.xaxis.set_major_locator(ticker.MaxNLocator(5))
 
-    # Plot velocity / horizontal modes
+    # Plot eta modes
     etam = reconstruct_eta(flux)
     ax = axx[1]
     flux.mooring.eta.isel(time=ti).plot(ax=ax, y="nomz", linestyle="", marker="o", markersize=6, color="k")

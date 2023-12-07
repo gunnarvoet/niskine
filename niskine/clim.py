@@ -246,11 +246,18 @@ def interpolate_seasonal_data(time, da):
         while yy > 0:
             tmp2 = np.concatenate([tmp2, tmp], axis=timeax)
             yy -= 1
-    da2 = xr.DataArray(
-        tmp2,
-        coords={"time": (["time"], timenew), "z": (["z"], da.z.data)},
-        dims=["z", "time"],
-    )
+    if "z" in da.dims:
+        da2 = xr.DataArray(
+            tmp2,
+            coords={"time": (["time"], timenew), "z": (["z"], da.z.data)},
+            dims=["z", "time"],
+        )
+    else:
+        da2 = xr.DataArray(
+            tmp2,
+            coords={"time": (["time"], timenew)},
+            dims=["time"],
+        )
     return da2.interp_like(time)
 
 
@@ -260,7 +267,8 @@ def get_wkb_factors(adcp):
     an2 = niskine.clim.interpolate_seasonal_data(adcp.time, n2)
     adcp["n2"] = an2.interp_like(adcp)
     adcp["N"] = np.sqrt(adcp.n2)
-    N0 = adcp.N.where((adcp.z<1200) & (adcp.z>300)).mean().item()
+    # N0 = adcp.N.where((adcp.z<1200) & (adcp.z>300)).mean().item()
+    N0 = adcp.N.mean().item()
     wkb = 1/np.sqrt(adcp.N/N0)
     wkb.name = "wkb normalization factor"
     return wkb

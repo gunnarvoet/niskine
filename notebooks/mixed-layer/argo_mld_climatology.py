@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.0
+#       jupytext_version: 1.15.2
 #   kernelspec:
 #     display_name: Python [conda env:niskine]
 #     language: python
@@ -78,6 +78,9 @@ mld_argo
 # %%
 mld_argo.to_netcdf(conf.data.ml.mld_argo)
 
+# %%
+mld_argo.da.isel(month=8).plot()
+
 # %% [markdown]
 # ## Compare with NISKINe MLD
 
@@ -94,5 +97,8 @@ ax.legend()
 ax.set(ylabel='MLD [m]')
 niskine.io.png('mld_argo_and_niskine', subdir='mixed-layer')
 
+# %% [markdown]
+# How shallow is the mixed layer in summer?
+
 # %%
-mld_argo.da.isel(month=8).plot()
+mld_argo.da_m1[5:8]

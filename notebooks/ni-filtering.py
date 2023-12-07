@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.0
+#       jupytext_version: 1.15.2
 #   kernelspec:
 #     display_name: Python [conda env:niskine]
 #     language: python
@@ -49,14 +49,14 @@ mld = xr.open_dataarray(cfg.data.ml.mld)
 # Apply bandpass filter to ADCP velocity. Mooring knockdown causes some depth levels to have NaN's so we have to deal with those.
 
 # %%
-a = niskine.io.load_gridded_adcp(mooring=1)
-a2 = niskine.io.load_gridded_adcp(mooring=2)
+adcp = niskine.io.load_gridded_adcp(mooring=1)
+adcp2 = niskine.io.load_gridded_adcp(mooring=2)
 
 # %%
 subset = slice("2019-11-09", "2019-11-23")
 
 # %%
-aa = a.sel(time=subset)
+aa = adcp.sel(time=subset)
 
 # %%
 test = aa.u.interpolate_na(dim="time", limit=20)
@@ -71,23 +71,41 @@ ax = aa.u.gv.tplot()
 # We want the bandpass cutoff $c$ to be $c f < c^{-1} \omega_{SD}$, that is not to overlap with the semidiurnal tidal band.
 
 # %%
-f = gv.ocean.inertial_frequency(a.lat)
+f = gv.ocean.inertial_frequency(adcp.lat)
 omega_sd = (2*np.pi)/(12.4*3600)
 
 # %%
 c = 1.06
 
 # %%
+tlow, thigh = niskine.calcs.determine_ni_band(bandwidth=c)
+print(tlow, thigh)
+
+# %%
 (c*f) / ((1/c)*omega_sd)
+
+# %% [markdown]
+# Define a broader cutoff for testing.
+
+# %%
+c2 = 1.15
+
+# %%
+tlow, thigh = niskine.calcs.determine_ni_band(bandwidth=c2)
+print(tlow, thigh)
 
 
 # %%
-def ni_bandpass_adcp(adcp, bandwidth=1.06):
-    tlow, thigh = niskine.calcs.determine_ni_band(bandwidth=1.06)
+def ni_bandpass_adcp(adcp, bandwidth=1.06, interpolate_gap_h=4):
+    tlow, thigh = niskine.calcs.determine_ni_band(bandwidth=bandwidth)
     outu = adcp.u.copy()
-    outu = outu.interpolate_na(dim="time", max_gap=np.timedelta64(8, "h"))
+    outu = outu.interpolate_na(
+        dim="time", max_gap=np.timedelta64(interpolate_gap_h, "h")
+    )
     outv = adcp.v.copy()
-    outv = outv.interpolate_na(dim="time", max_gap=np.timedelta64(8, "h"))
+    outv = outv.interpolate_na(
+        dim="time", max_gap=np.timedelta64(interpolate_gap_h, "h")
+    )
     i = 0
     for g, aai in outu.groupby("z"):
         outu[i, :] = niskine.calcs.bandpass_time_series(aai.data, tlow, thigh, fs=6)
@@ -101,6 +119,28 @@ def ni_bandpass_adcp(adcp, bandwidth=1.06):
     return adcp
 
 
+# %% [markdown]
+# reviewer asked for calculating WKB with full-depth averaged $N_0$. Let's see how much the factor changes...
+
+# %%
+m1lon, m1lat, m1depth = niskine.io.mooring_location(mooring=1)
+n2, tz = niskine.clim.climatology_argo_woce(m1lon, m1lat, m1depth)
+an2 = niskine.clim.interpolate_seasonal_data(adcp.time, n2)
+adcp["n2"] = an2.interp_like(adcp)
+adcp["N"] = np.sqrt(adcp.n2)
+N0 = adcp.N.where((adcp.z<1200) & (adcp.z>300)).mean().item()
+
+# %%
+N0
+
+# %%
+N0new = adcp.N.mean().item()
+N0new
+
+
+# %% [markdown]
+# Not much of a change. We'll apply this. Code in `niskine.clim.get_wkb_factors()` has been changed.
+
 # %%
 def calc_ni_eke(adcp):
     rho = 1025
@@ -112,11 +152,15 @@ def calc_ni_eke(adcp):
 
 
 # %%
-a = ni_bandpass_adcp(a)
+a = ni_bandpass_adcp(adcp.copy())
 a = calc_ni_eke(a)
 
 # %%
-a2 = ni_bandpass_adcp(a2)
+a_wide = ni_bandpass_adcp(adcp.copy(), bandwidth=c2)
+a_wide = calc_ni_eke(a_wide)
+
+# %%
+a2 = ni_bandpass_adcp(adcp2.copy())
 a2 = calc_ni_eke(a2)
 
 # %%
@@ -124,6 +168,9 @@ a.ni_eke.to_netcdf(cfg.data.ni_eke_m1)
 
 # %%
 a2.ni_eke.to_netcdf(cfg.data.ni_eke_m2)
+
+# %%
+(a.bpu.sel(time=slice("2019-09", "2019-10"))**2).gv.plot(robust=True)
 
 # %%
 fig, ax = gv.plot.quickfig(w=8)
@@ -149,6 +196,115 @@ for c in h.collections:
     c.set_edgecolor("face")
 
 ax = mld.gv.tcoarsen(n=30 * 24 * 2).gv.tplot(ax=ax, color="k", linewidth=1, alpha=0.6)
+ax.invert_yaxis()
+ax.set(xlabel="", ylabel="depth [m]", title="NI EKE M1", ylim=(1400, 0))
+gv.plot.concise_date(ax)
+
+# %%
+fig, ax = gv.plot.quickfig(w=8)
+h = (
+    a_wide.ni_eke.resample(time="8h")
+    .mean()
+    .plot.contourf(
+        ax=ax,
+        extend="both",
+        levels=np.arange(0.5, 4, 0.5),
+        cmap="Spectral_r",
+        antialiased=True,
+        cbar_kwargs=dict(
+            aspect=30,
+            shrink=0.7,
+            pad=0.01,
+            label="NI EKE",
+        ),
+    )
+)
+for c in h.collections:
+    c.set_rasterized(True)
+    c.set_edgecolor("face")
+
+ax = mld.gv.tcoarsen(n=30 * 24 * 2).gv.tplot(ax=ax, color="k", linewidth=1, alpha=0.6)
+ax.invert_yaxis()
+ax.set(xlabel="", ylabel="depth [m]", title="NI EKE M1 wide band", ylim=(1400, 0))
+gv.plot.concise_date(ax)
+
+# %%
+(a_wide.ni_eke - a.ni_eke).resample(time="8h").mean().gv.plot(
+    robust=True, cmap="RdBu_r"
+)
+
+
+# %%
+def plot_3month_ni_ke(ts):
+    fig, ax = gv.plot.quickfig(w=8, h=3, grid=True)
+    h = (
+        a_wide.ni_eke.sel(time=ts)
+        .resample(time="7h")
+        .mean()
+        .plot.contourf(
+            ax=ax,
+            extend="both",
+            levels=np.arange(0.5, 4, 0.5),
+            cmap="Spectral_r",
+            antialiased=True,
+            cbar_kwargs=dict(
+                aspect=30,
+                shrink=0.7,
+                pad=0.01,
+                label="NI EKE",
+            ),
+        )
+    )
+    for c in h.collections:
+        c.set_rasterized(True)
+        c.set_edgecolor("face")
+
+    mld_sel = mld.sel(time=ts).gv.tcoarsen(n=30 * 24 * 2)
+    ax = mld_sel.gv.tplot(ax=ax, color="w", linewidth=2, alpha=1)
+    ax = mld_sel.gv.tplot(ax=ax, color="k", linewidth=1, alpha=1)
+
+    ax.invert_yaxis()
+    ax.set(xlabel="", ylabel="depth [m]", title="NI EKE M1", ylim=(1400, 0))
+    gv.plot.concise_date(ax)
+
+
+# %%
+tt = [slice("2019-05", "2019-09"), slice("2019-10", "2019-12"), slice("2020-01", "2020-03"), slice("2020-04", "2020-06"), slice("2020-07", "2020-10")]
+for ts in tt:
+    plot_3month_ni_ke(ts)
+
+# %% [markdown]
+# Is this pattern some kind of beating with the semidiurnal tide?
+
+# %%
+ts = slice("2020-01", "2020-03")
+fig, ax = gv.plot.quickfig(w=8, grid=True)
+h = (
+    a_wide.ni_eke.sel(time=ts)
+    .resample(time="7h")
+    .mean()
+    .plot.contourf(
+        ax=ax,
+        extend="both",
+        levels=np.arange(0.5, 4, 0.5),
+        cmap="Spectral_r",
+        antialiased=True,
+        cbar_kwargs=dict(
+            aspect=30,
+            shrink=0.7,
+            pad=0.01,
+            label="NI EKE",
+        ),
+    )
+)
+for c in h.collections:
+    c.set_rasterized(True)
+    c.set_edgecolor("face")
+
+mld_sel = mld.sel(time=ts).gv.tcoarsen(n=30 * 24 * 2)
+ax = mld_sel.gv.tplot(ax=ax, color="w", linewidth=2, alpha=1)
+ax = mld_sel.gv.tplot(ax=ax, color="k", linewidth=1, alpha=1)
+
 ax.invert_yaxis()
 ax.set(xlabel="", ylabel="depth [m]", title="NI EKE M1", ylim=(1400, 0))
 gv.plot.concise_date(ax)

@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.0
+#       jupytext_version: 1.15.2
 #   kernelspec:
 #     display_name: Python [conda env:niskine]
 #     language: python
@@ -26,6 +26,7 @@ import pandas as pd
 import xarray as xr
 from pathlib import Path
 import gsw
+from argopy import DataFetcher as ArgoDataFetcher
 
 import gvpy as gv
 import niskine
@@ -43,43 +44,26 @@ cfg = niskine.io.load_config()
 mld = xr.open_dataarray(cfg.data.ml.mld)
 
 # %% [markdown]
-# # Argo N$^2$
+# # Argo Float Data
 
-# %%
-adcp = niskine.io.load_gridded_adcp(mooring=1)
+# %% [markdown]
+# https://argopy.readthedocs.io/en/latest/usage.html
 
 # %%
 m1lon, m1lat, m1depth = niskine.io.mooring_location(mooring=1)
-n2a, tz = niskine.clim.climatology_argo_woce(m1lon, m1lat, m1depth)
-an2 = niskine.clim.interpolate_seasonal_data(adcp.time, n2a)
-n2 = an2.interp_like(adcp)
 
 # %%
-# n2.to_netcdf("argo_n2_at_m1.nc")
-# an2.to_netcdf("argo_n2_at_m1_full_depth.nc")
+deltalat = 1
+deltalon = np.cos(np.deg2rad(m1lat)) / deltalat
 
 # %%
-an2.isel(time=10).plot(y="z")
-n2.isel(time=10).plot(y="z")
+argo1d = ArgoDataFetcher().region([m1lon-deltalon, m1lon+deltalon, m1lat-deltalat, m1lat+deltalat, 0, 2000, '2019-05', '2020-11']).to_xarray()
+
+# %%
+argo = argo1d.argo.point2profile()
 
 # %% [markdown]
-# Save mean N$^2$ profile as .mat file.
+# Only 10 profiles, none of them in the winter.
 
 # %%
-n2a.mean(dim="time").plot()
-
-# %%
-out = dict(N2=n2a.mean(dim="time").data, depth=n2a.z.data)
-
-# %%
-gv.io.savemat(out, "../data/N2.mat")
-
-# %%
-test = gv.io.loadmat("../data/N2.mat")
-
-# %%
-fig, ax = gv.plot.quickfig()
-ax.plot(test["N2"], test["depth"])
-ax.set(xscale="log")
-
-# %%
+argo.TIME.data

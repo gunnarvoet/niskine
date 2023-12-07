@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.0
+#       jupytext_version: 1.15.2
 #   kernelspec:
 #     display_name: Python [conda env:niskine]
 #     language: python
@@ -54,7 +54,7 @@ ssh = niskine.io.load_ssh(hourly=True)
 gv.plot.helvetica()
 
 # %% [markdown]
-# # NISKINe SSH Analysis
+# # Overview Map
 
 # %% [markdown]
 # Calculate EKE as variance of eddy currents following [Heywood et al. 1994](https://agupubs.onlinelibrary.wiley.com/doi/pdf/10.1029/94JC01740)
@@ -66,7 +66,7 @@ gv.plot.helvetica()
 # ## Load data
 
 # %%
-locs = xr.open_dataset(cfg.mooring_locations)
+locs = xr.open_dataset(cfg.mooring_locations).load()
 
 # %%
 for g, li in locs.groupby("mooring"):
@@ -94,6 +94,36 @@ ss = gv.ocean.smith_sandwell(lon=alt.lon, lat=alt.lat, pad=(0.2, 0.2), subsample
 
 # %%
 ss.plot()
+
+# %% [markdown]
+# ### EM Float Locations
+
+# %%
+cols = ["drop number", "year", "month", "day", "hour", "minute", "second", "latitude", "longitude", "dummy"]
+emfloat = pd.read_csv(cfg.em_float_locations, sep=" ", skiprows=[0], header=None, names=cols, index_col=False)
+
+# %%
+emfloat
+
+# %%
+em_time = pd.to_datetime(emfloat[["year", "month", "day", "hour", "minute", "second"]]).to_xarray()
+
+# %%
+em_lon = emfloat["longitude"]
+em_lat = emfloat["latitude"]
+
+# %%
+fig, ax = gv.plot.quickfig()
+em_time.plot(ax=ax)
+
+# %%
+fig, ax = gv.plot.quickfig()
+ax.plot(em_time, em_lat, marker="o", markersize=3)
+gv.plot.concise_date(ax)
+
+# %%
+fig, ax = gv.plot.quickfig()
+ax.plot(em_lon, em_lat)
 
 # %% [markdown]
 # ## Plot
@@ -321,21 +351,110 @@ ax.plot(
     zorder=12,
     markersize=5,
 )
-ax.annotate('OSNAP', xy=(mm4lon, mm4lat), xytext=(3, -7),
-         textcoords='offset points', ha='left', va='center',
-         color="k", fontweight="bold",
-         transform=ccrs.PlateCarree(),
-         zorder=12)
-    
-nislon = locs.sel(mooring=1).lon_actual
-nislat = locs.sel(mooring=1).lat_actual
-ax.annotate('NISKINE', xy=(nislon, nislat), xytext=(-3, 7),
-         textcoords='offset points', ha='right', va='center',
-         color="w", fontweight="bold",
-         transform=ccrs.PlateCarree(),
-         zorder=12)
+ax.annotate(
+    "OSNAP\nMM4",
+    xy=(mm4lon, mm4lat),
+    xytext=(0, -7),
+    textcoords="offset points",
+    ha="center",
+    va="top",
+    color="k",
+    fontweight="bold",
+    transform=ccrs.PlateCarree(),
+    zorder=12,
+)
 
+# trajectory of EM-APEX float
+ax.plot(em_lon,
+        em_lat,
+        color="w",
+        linewidth=0.75,
+        marker="o",
+        markersize=1,
+        transform=ccrs.PlateCarree(),
+        zorder=13,
+       )
+for i in [0, 180, 303]:
+    ax.plot(em_lon[i],
+            em_lat[i],
+            color="aquamarine",
+            linewidth=0.75,
+            marker="o",
+            markersize=5,
+            transform=ccrs.PlateCarree(),
+            zorder=14,
+           )
+    ax.annotate(
+        gv.time.datetime64_to_str(em_time[i].data),
+        xy=(em_lon[i], em_lat[i]),
+        xytext=(4, 7),
+        textcoords="offset points",
+        transform=ccrs.PlateCarree(),
+        ha="right",
+        va="center",
+        fontsize=8,
+        color="aquamarine",
+        zorder=14,
+    )
 
+m1lon = locs.sel(mooring=1).lon_actual
+m1lat = locs.sel(mooring=1).lat_actual
+nislon = locs.sel(mooring=2).lon_actual
+nislat = locs.sel(mooring=2).lat_actual
+ax.annotate(
+    "NISKINE",
+    xy=(nislon, nislat),
+    xytext=(3, -7),
+    textcoords="offset points",
+    ha="left",
+    va="center",
+    color="w",
+    fontweight="bold",
+    transform=ccrs.PlateCarree(),
+    zorder=12,
+)
+ax.annotate(
+    "M1",
+    xy=(m1lon, m1lat),
+    xytext=(13, 12),
+    textcoords="offset points",
+    arrowprops=dict(arrowstyle="->", connectionstyle="arc3,rad=0.3", color="w"),
+    ha="left",
+    va="center",
+    color="w",
+    fontweight="bold",
+    transform=ccrs.PlateCarree(),
+    zorder=12,
+    bbox=dict(pad=0, facecolor="none", edgecolor="none")
+)
+
+ax.annotate(
+    "EM-APEX Float",
+    xy=(-26, 59.9),
+    transform=ccrs.PlateCarree(),
+    ha="center",
+    va="center",
+    color="w",
+    zorder=12,
+)
+
+ax.annotate(
+    "Hatton Bank",
+    xy=(-18, 58),
+    transform=ccrs.PlateCarree(),
+    ha="center",
+    va="center",
+    rotation=45,
+)
+
+ax.annotate(
+    "Reykjanes Ridge",
+    xy=(-27, 61),
+    transform=ccrs.PlateCarree(),
+    ha="center",
+    va="center",
+    rotation=48,
+)
 
 ax.set(title="")
 niskine.io.png("map_eke_mean")

@@ -183,7 +183,8 @@ class MixedLayerDepth:
         self.mld.plot(ax=ax[2], color=bc, yincrease=False)
         self.mld.where(self.mask_sst & self.mask_knockdown).plot(ax=ax[2], color="k")
         _data_array_annotate(
-            ax[2], self.mld, "2019-11-01", "MLD 0.2° criterion", (-45, 450), color="k"
+            ax[2], self.mld, "2019-11-01", "mooring MLD with\n0.2° threshold", (18, 560),
+            color="k", ha="center",
         )
         ax[2].plot(self.temp.time, self.argo_mld_i, color="w", linewidth=1.75)
         ax[2].plot(self.temp.time, self.argo_mld_i, color="C0", linewidth=1.0)
@@ -202,12 +203,12 @@ class MixedLayerDepth:
             ax[3],
             self.mld_c,
             "2019-11-01",
-            "MLD",
+            "MLD final",
             (-40, 320),
             color="k",
         )
 
-        gv.plot.concise_date_all()
+        gv.plot.concise_date(ax[-1])
         for axi in ax:
             gv.plot.axstyle(axi)
             axi.set(xlabel="", title="")
@@ -629,3 +630,80 @@ def _data_array_annotate(ax, da, time, text, offset, **kwargs):
     ax.annotate(
         text, xy=(x, y), xytext=offset, textcoords=("offset points", "data"), **kwargs
     )
+
+
+def ni_ke_by_vort_and_wind():
+    cfg = niskine.io.load_config()
+    rho0 = 1025
+
+    # load mooring locations
+    locs = xr.open_dataset(cfg.mooring_locations)
+    locs.close()
+
+    # load vorticity & EKE at M1
+    alt = xr.open_dataset(cfg.data.ssh_m1)
+    alt.close()
+
+    # load NI EKE
+    ni_eke = xr.open_dataarray(cfg.data.ni_eke_m1)
+    ni_eke.close()
+
+    # interpolate vorticity to NI EKE
+    vorti = alt.vort.interp_like(ni_eke)
+
+    # define masks for positive and negative vorticity
+    mask_pos = vorti > 0
+    mask_neg = vorti < 0
+
+    # load wind stress (N/m^2)
+    wind_stress = xr.open_dataarray(cfg.data.wind_work.niskine_m1_wind_stress).interp_like(
+        ni_eke
+    )
+    wind_stress.close()
+    # There are a few values at the edges that end up being nan's, let's just
+    # set them to zero so we don't have to deal with them. It's really only
+    # less than an hour on each side from the interpolation above.
+    wind_stress[np.isnan(wind_stress)] = 0
+
+    percentile = 50
+    print(f"wind stress {percentile} percentile: {np.percentile(wind_stress, 50):1.2f} N/m^2")
+
+    mask_high_wind_stress = wind_stress > 0.1
+    mask_low_wind_stress = wind_stress < 0.1
+
+    # Drop depth levels where we have only very little NI EKE data.
+    maskna = (~np.isnan(ni_eke)).sum(dim="time") > 7e4
+
+    # divide into positive and negative vorticity
+    mp = ni_eke.where(mask_pos & maskna).mean(dim="time")
+    mn = ni_eke.where(mask_neg & maskna).mean(dim="time")
+
+    # divide into positive and negative vorticity and only high wind stress
+    mp_hws = ni_eke.where(mask_pos & maskna & mask_high_wind_stress).mean(dim="time")
+    mn_hws = ni_eke.where(mask_neg & maskna & mask_high_wind_stress).mean(dim="time")
+
+    # divide into positive and negative vorticity and low wind stress
+    mp_lws = ni_eke.where(mask_pos & maskna & mask_low_wind_stress).mean(dim="time")
+    mn_lws = ni_eke.where(mask_neg & maskna & mask_low_wind_stress).mean(dim="time")
+
+    # number of days in the time series
+    ndays = (ni_eke.time[-1] - ni_eke.time[0]).data.astype('timedelta64[D]')
+    print(f"length of time series: {ndays}")
+
+    ni_eke_daily = ni_eke.resample(time="d").mean()
+    vorti_daily = vorti.resample(time="d").mean()
+
+    decorrelation_time_scale = np.timedelta64(7, "D")
+    print(f"setting decorrelation time scale to 7 days")
+
+    dof = ndays / decorrelation_time_scale
+    print(f"dof: {dof:1.0f}")
+
+    mp_std = ni_eke.where(mask_pos & maskna).std(dim="time")
+    mp_se = mp_std / np.sqrt(dof)
+    mn_std = ni_eke.where(mask_neg & maskna).std(dim="time")
+    mn_se = mn_std / np.sqrt(dof)
+
+    out = dict(mp=mp, mn=mn, mp_hws=mp_hws, mp_lws=mp_lws, mn_hws=mn_hws, mn_lws=mn_lws, mp_se=mp_se, mn_se=mn_se)
+
+    return out

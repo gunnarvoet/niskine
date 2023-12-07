@@ -503,7 +503,7 @@ def read_microcats(common_time=None):
         timeslice = mooring_start_end_time(mooring=1)
         common_time = np.arange(
             timeslice.start, timeslice.stop, dtype="datetime64[20m]"
-        ).astype("datetime64[m]")
+        ).astype("datetime64[ns]")
     cfg = load_config()
     dir = cfg.data.proc.sbe37
     sbes = []
