@@ -6,9 +6,9 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.15.2
+#       jupytext_version: 1.16.0
 #   kernelspec:
-#     display_name: Python [conda env:niskine]
+#     display_name: python3 (niskine)
 #     language: python
 #     name: conda-env-niskine-py
 # ---
@@ -58,8 +58,7 @@ gv.plot.helvetica()
 
 # %% [markdown]
 # Calculate EKE as variance of eddy currents following [Heywood et al. 1994](https://agupubs.onlinelibrary.wiley.com/doi/pdf/10.1029/94JC01740)
-
-# %% [markdown]
+#
 # This notebook was initially used for mooring planning purposes. An old copy is still somewhere in Gunnar's old `niskine/py` directory. Here we are looking at SSH data downloaded for the time of the NISKINe moorings but also starting at 2005 to have some climatological statistics.
 
 # %% [markdown]
@@ -99,14 +98,34 @@ ss.plot()
 # ### EM Float Locations
 
 # %%
-cols = ["drop number", "year", "month", "day", "hour", "minute", "second", "latitude", "longitude", "dummy"]
-emfloat = pd.read_csv(cfg.em_float_locations, sep=" ", skiprows=[0], header=None, names=cols, index_col=False)
+cols = [
+    "drop number",
+    "year",
+    "month",
+    "day",
+    "hour",
+    "minute",
+    "second",
+    "latitude",
+    "longitude",
+    "dummy",
+]
+emfloat = pd.read_csv(
+    cfg.em_float_locations,
+    sep=" ",
+    skiprows=[0],
+    header=None,
+    names=cols,
+    index_col=False,
+)
 
 # %%
 emfloat
 
 # %%
-em_time = pd.to_datetime(emfloat[["year", "month", "day", "hour", "minute", "second"]]).to_xarray()
+em_time = pd.to_datetime(
+    emfloat[["year", "month", "day", "hour", "minute", "second"]]
+).to_xarray()
 
 # %%
 em_lon = emfloat["longitude"]
@@ -144,16 +163,20 @@ alt.sla.isel(time=0).plot.contour()
 ss.plot.contour(colors='k')
 
 # %%
-h = alt.eke.mean(dim='time').plot(cmap='magma')
-h.colorbar.set_label('EKE')
-ss.plot.contour(levels=np.arange(-3000, 500, 500), colors='w', linestyles='-', linewidths=0.5);
+h = alt.eke.mean(dim="time").plot(cmap="magma")
+h.colorbar.set_label("EKE")
+ss.plot.contour(
+    levels=np.arange(-3000, 500, 500), colors="w", linestyles="-", linewidths=0.5
+);
 
 # %%
 eke_mean = alt.eke.mean(dim='time')
 eke_var = alt.eke.var(dim='time')
 
 # %%
-eke_at_m1 = alt.eke.interp(lon=locs.sel(mooring=1).lon_actual, lat=locs.sel(mooring=1).lat_actual)
+eke_at_m1 = alt.eke.interp(
+    lon=locs.sel(mooring=1).lon_actual, lat=locs.sel(mooring=1).lat_actual
+)
 
 # %%
 eke_at_m1.groupby('time.month').mean('time').plot()
@@ -174,11 +197,12 @@ eke_climatology = alt.eke.groupby('time.month').mean('time')
 # %%
 def gl_format(ax):
     from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
+
     gl = ax.gridlines(draw_labels=True)
-    gl.xlabels_top=False
-    gl.xlines=False
-    gl.ylabels_right=False
-    gl.ylines=False
+    gl.xlabels_top = False
+    gl.xlines = False
+    gl.ylabels_right = False
+    gl.ylines = False
     gl.xformatter = LONGITUDE_FORMATTER
     gl.yformatter = LATITUDE_FORMATTER
     return gl
@@ -186,12 +210,20 @@ def gl_format(ax):
 
 # %%
 fig = plt.figure(figsize=(20, 5))
-h = eke_climatology.plot(col='month', col_wrap=4, cmap='magma', cbar_kwargs={'shrink': 0.75})
+h = eke_climatology.plot(
+    col="month", col_wrap=4, cmap="magma", cbar_kwargs={"shrink": 0.75}
+)
 for i, ax in enumerate(h.axs.flatten()):
-    ss.plot.contour(levels=np.arange(-3000, 1000, 1000), colors='w', linestyles='-', linewidths=0.5, ax=ax)
-    ax.set(xlabel='', ylabel='', title='month {}'.format(i+1))
+    ss.plot.contour(
+        levels=np.arange(-3000, 1000, 1000),
+        colors="w",
+        linestyles="-",
+        linewidths=0.5,
+        ax=ax,
+    )
+    ax.set(xlabel="", ylabel="", title="month {}".format(i + 1))
 #     gl_format(ax)
-h.cbar.set_label('EKE')
+h.cbar.set_label("EKE")
 # plt.savefig('eke_climatology.png', dpi=200, bbox_inches='tight')
 
 # %% [markdown]
@@ -208,24 +240,30 @@ eof1 = solver.eofsAsCovariance(neofs=4)
 pc1 = solver.pcs(npcs=4, pcscaling=1)
 
 # %%
-h = eof1.isel(mode=range(4)).plot(col='mode')
-alt.eke.mean(dim='time').plot.contour(cmap='Purples', ax=h.axs[0][0])
+h = eof1.isel(mode=range(4)).plot(col="mode")
+alt.eke.mean(dim="time").plot.contour(cmap="Purples", ax=h.axs[0][0])
 for i, ax in enumerate(h.axs[0]):
-    ss.plot.contour(levels=np.arange(-3000, 500, 500), colors='k', linestyles='-', linewidths=0.5, ax=ax)
-    ax.set(ylabel='', xlabel='', title='mode {}'.format(i))
+    ss.plot.contour(
+        levels=np.arange(-3000, 500, 500),
+        colors="k",
+        linestyles="-",
+        linewidths=0.5,
+        ax=ax,
+    )
+    ax.set(ylabel="", xlabel="", title="mode {}".format(i))
 # plt.savefig('eof_first_4_modes.png', dpi=200, bbox_inches='tight')
 
 # %%
-mode0_corr_annual_cycle = pc1.isel(mode=0).groupby('time.month').mean('time')
+mode0_corr_annual_cycle = pc1.isel(mode=0).groupby("time.month").mean("time")
 
 # %%
 mode0_corr_annual_cycle.plot()
 
 # %%
-pc1.isel(mode=range(4)).plot(col='mode');
+pc1.isel(mode=range(4)).plot(col="mode");
 
 # %%
-pc1.isel(mode=range(4)).groupby('time.month').mean('time').plot(col='mode');
+pc1.isel(mode=range(4)).groupby("time.month").mean("time").plot(col="mode");
 
 # %%
 explained = solver.varianceFraction()
@@ -237,7 +275,7 @@ explained[0]/explained[:5].sum()
 explained[:3].sum()/explained[:5].sum()
 
 # %%
-explained[:10].plot(marker='o')
+explained[:10].plot(marker="o")
 
 # %%
 hsa = gv.maps.HillShade(-ss.data, ss.lon, ss.lat, smoothtopo=3)
@@ -365,35 +403,36 @@ ax.annotate(
 )
 
 # trajectory of EM-APEX float
-ax.plot(em_lon,
-        em_lat,
-        color="w",
-        linewidth=0.75,
-        marker="o",
-        markersize=1,
-        transform=ccrs.PlateCarree(),
-        zorder=13,
-       )
+ax.plot(
+    em_lon,
+    em_lat,
+    color="w",
+    linewidth=0.75,
+    marker="o",
+    markersize=1,
+    transform=ccrs.PlateCarree(),
+    zorder=13,
+)
 for i in [0, 180, 303]:
-    ax.plot(em_lon[i],
-            em_lat[i],
-            color="aquamarine",
-            linewidth=0.75,
-            marker="o",
-            markersize=5,
-            transform=ccrs.PlateCarree(),
-            zorder=14,
-           )
+    ax.plot(
+        em_lon[i],
+        em_lat[i],
+        color="k",
+        marker="o",
+        markersize=3,
+        transform=ccrs.PlateCarree(),
+        zorder=14,
+    )
     ax.annotate(
         gv.time.datetime64_to_str(em_time[i].data),
         xy=(em_lon[i], em_lat[i]),
-        xytext=(4, 7),
+        xytext=(4+i/30, 7),
         textcoords="offset points",
         transform=ccrs.PlateCarree(),
         ha="right",
         va="center",
         fontsize=8,
-        color="aquamarine",
+        color="w",
         zorder=14,
     )
 
@@ -425,12 +464,27 @@ ax.annotate(
     fontweight="bold",
     transform=ccrs.PlateCarree(),
     zorder=12,
-    bbox=dict(pad=0, facecolor="none", edgecolor="none")
+    bbox=dict(pad=0, facecolor="none", edgecolor="none"),
 )
+# ax.plot(m1lon, m1lat,
+#     transform=ccrs.PlateCarree(),
+#     color="darkorange",
+#     marker="o",
+#     markersize="5",
+#     zorder=13,
+# )
+# ax.plot(m1lon, m1lat,
+#     transform=ccrs.PlateCarree(),
+#     color="k",
+#     marker="x",
+#     markersize="5",
+#     zorder=13,
+# )
+
 
 ax.annotate(
     "EM-APEX Float",
-    xy=(-26, 59.9),
+    xy=(-28.3, 57.7),
     transform=ccrs.PlateCarree(),
     ha="center",
     va="center",

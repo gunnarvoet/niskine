@@ -6,9 +6,9 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.15.1
+#       jupytext_version: 1.16.0
 #   kernelspec:
-#     display_name: Python [conda env:niskine]
+#     display_name: python3 (niskine)
 #     language: python
 #     name: conda-env-niskine-py
 # ---
@@ -77,10 +77,10 @@ mpl.rcParams["lines.linewidth"] = 1
 # - If you could somehow determine the vertical group speed for each frequency and vertical wavenumber, you could infer the horizontal wavenumber (from the dispersion relation) and compare that to eddy size. Leif or Bill also has an equation that relates the horizontal wavneumber to vorticity and time. This equation could determine whether beta or zeta refraction is more plausible for the higher modes. 
 
 # %%
-240e3/0.5/24/3600
+240e3 / 0.5 / 24 / 3600
 
 # %%
-0.6*600
+0.6 * 600
 
 # %% [markdown]
 # ---
@@ -104,7 +104,9 @@ N = niskine.flux.Flux(mooring=m1, bandwidth=1.06, runall=True, climatology="ARGO
 np.sqrt(N.N2s.mean(dim="time").sel(z=800, method="nearest").item())
 
 # %% [markdown]
+#
 # ---
+#
 
 # %% [markdown]
 # Calculate the beta plane approximation as $\beta = 2 \Omega \cos(\phi_0) / r_a$ where $\Omega$ is the angular rotation rate of the earth, $\phi_0$ is the central latitude, and $r_a$ the earth's radius.
@@ -144,25 +146,25 @@ cg_high = 0.6
 # $\omega_n = 1.055f$ appears to be pretty close.
 
 # %%
-om_n = 1.055*f
-np.sqrt(om_n**2-f**2)/om_n*cn/cg
+om_n = 1.055 * f
+np.sqrt(om_n**2 - f**2) / om_n * cn / cg
 
 # %%
-np.sqrt(1 - f**2 / om_n**2) *cn/cg
+np.sqrt(1 - f**2 / om_n**2) * cn / cg
 
 # %%
-om_n_low = 1.035*f
-np.sqrt(om_n_low**2-f**2)/om_n*cn/cg_low
+om_n_low = 1.035 * f
+np.sqrt(om_n_low**2 - f**2) / om_n * cn / cg_low
 
 # %%
-om_n_high = 1.078*f
-np.sqrt(om_n_high**2-f**2)/om_n*cn/cg_high
+om_n_high = 1.078 * f
+np.sqrt(om_n_high**2 - f**2) / om_n * cn / cg_high
 
 # %% [markdown]
 # Calculate distance to turning latitude.
 
 # %%
-dist_beta = (om_n-f) / beta / 1e3
+dist_beta = (om_n - f) / beta / 1e3
 print(f"distance to turning latitude: {dist_beta:1.0f} km")
 
 # %% [markdown]
@@ -172,13 +174,13 @@ print(f"distance to turning latitude: {dist_beta:1.0f} km")
 # > eigenvalue in you problem has an eigenspeed of cn=sqrt(1/ev). The phase speed is  cp = omega/k = cn / sqrt(1-omega^2/f^2) and group speed is cg = sqrt(1-omega^2/f^2) * cn 
 
 # %%
-cp = cn / (np.sqrt(np.absolute(1 - om_n**2/f**2)))
+cp = cn / (np.sqrt(np.absolute(1 - om_n**2 / f**2)))
 
 # %%
 # cp
 
 # %%
-cp = (om_n / np.sqrt(om_n**2 - f**2)) * cn 
+cp = (om_n / np.sqrt(om_n**2 - f**2)) * cn
 
 # %%
 # cp
@@ -193,27 +195,27 @@ cp = (om_n / np.sqrt(om_n**2 - f**2)) * cn
 # which is simply $\partial \omega / \partial k$ of the term above. Yes, they also have $\sigma_n$ in their equations which is their eigenspeed I think.
 
 # %%
-k = np.sqrt((om_n**2-f**2)/cn**2)
+k = np.sqrt((om_n**2 - f**2) / cn**2)
 print(f"{k:1.1e}")
 
 # %% [markdown]
 # Not sure if I am missing a factor of $2\pi$ here? Usually $k = 2 \pi / \lambda$ and thus $\lambda = 2 \pi / k$ so 240 km may be the right answer. If this lateral scale is reflective of the scale of the storm we are probably not too far off though.
 
 # %%
-1/k/1e3
+1 / k / 1e3
 
 # %%
-(2 * np.pi)/k/1e3
+(2 * np.pi) / k / 1e3
 
 # %% [markdown]
 # What is the difference between $f$ and $\mathrm{M}_2$ frequencies and at what period would this show up?
 
 # %%
 f = gv.ocean.inertial_frequency(lat)
-omega_sd = (2*np.pi)/(12.4*3600)
+omega_sd = (2 * np.pi) / (12.4 * 3600)
 
 # %%
-2*np.pi/f/3600
+2 * np.pi / f / 3600
 
 # %%
 ((2 * np.pi) / (omega_sd - f)) / 3600 / 24
@@ -240,20 +242,20 @@ omega_sd = (2*np.pi)/(12.4*3600)
 rho = 1025
 
 # %%
-ke = 0.5* rho * (N.up.sel(mode=1)**2 + N.vp.sel(mode=1)**2)
+ke = 0.5 * rho * (N.up.sel(mode=1) ** 2 + N.vp.sel(mode=1) ** 2)
 
 # %%
 ke_i = ke.integrate(coord="z")
 
 # %%
-ax = (ke_i/1e3).gv.tplot()
+ax = (ke_i / 1e3).gv.tplot()
 ax.set(ylabel="mode 1 KE [kJ/m$^2$]")
 
 # %% [markdown]
 # Load the mode 1 wind work.
 
 # %%
-m1ww = xr.open_dataarray(cfg.data.wind_work.niskine_m1)
+m1ww = xr.open_dataarray(cfg.data.wind_work.niskine_m1_mode1)
 m1ww = m1ww.interp_like(ke_i)
 
 # %%
@@ -263,11 +265,11 @@ m1ww.gv.tplot()
 # Divide energy by wind-work. 
 
 # %%
-decay_timescale = (ke_i / m1ww)
+decay_timescale = ke_i / m1ww
 
 # %%
 fig, ax = gv.plot.quickfig()
-(decay_timescale/3600/24).plot.hist(ax=ax, bins=np.arange(-50, 51, 1));
+(decay_timescale / 3600 / 24).plot.hist(ax=ax, bins=np.arange(-50, 51, 1))
 ax.set(title=None, xlabel="decay timescale [days]")
 
 
@@ -276,7 +278,6 @@ ax.set(title=None, xlabel="decay timescale [days]")
 
 # %%
 def decay_timescale(ww, ke, ax):
-
     # fit all positive data
     mask = ww > 0
     x = ww[mask]
@@ -290,12 +291,19 @@ def decay_timescale(ww, ke, ax):
 
     # calculate average mode 1 KE in mode 1 wind-work bins
     mask = ww > 0
-    ke_ww = xr.DataArray(ke[mask].data/1e3, coords=dict(ww=ww[mask].data*1e3), dims=["ww"])
-    ke_ww_binned = ke_ww.groupby_bins("ww", bins=np.arange(0, 1.1, 1e-1),
-                                      labels=np.arange(0.05, 1.05, 0.1)).mean()
+    ke_ww = xr.DataArray(
+        ke[mask].data / 1e3, coords=dict(ww=ww[mask].data * 1e3), dims=["ww"]
+    )
+    ke_ww_binned = ke_ww.groupby_bins(
+        "ww", bins=np.arange(0, 1.1, 1e-1), labels=np.arange(0.05, 1.05, 0.1)
+    ).mean()
 
-    # Linearly fit the bin-averaged mode 1 KE. Note that we have to multiply the slope by $10^6$ because the data is in mW/m$^2$ vs kJ/m$^2$. The vertical offset has to be multiplied by $10^3$ because of the kilo-scaling of the y-axis.
-    slope2, c2 = ke_ww_binned.polyfit(dim="ww_bins", deg=1).polyfit_coefficients.data * [1e6, 1e3]
+    # Linearly fit the bin-averaged mode 1 KE. Note that we have to multiply the slope
+    # by $10^6$ because the data is in mW/m$^2$ vs kJ/m$^2$. The vertical offset has
+    # to be multiplied by $10^3$ because of the kilo-scaling of the y-axis.
+    slope2, c2 = ke_ww_binned.polyfit(
+        dim="ww_bins", deg=1
+    ).polyfit_coefficients.data * [1e6, 1e3]
     print(f"decay time scale: {slope2/3600/24:1.1f} days")
 
     h, xedge, yedge, img = ax.hist2d(
@@ -312,17 +320,30 @@ def decay_timescale(ww, ke, ax):
     ax.set(xlabel="mode 1 wind-work [mW/m$^2$]", ylabel="mode 1 KE [kJ/m$^2$]")
     xx = np.arange(0, 2.1, 0.1)
 
-    ax.plot(xx, (slope * xx / 1e3 + offset) / 1e3, color="w", linewidth=3, linestyle="-")
-    ax.plot(xx, (slope * xx / 1e3 + offset) / 1e3, color="C0", linewidth=2, linestyle="-")
+    ax.plot(
+        xx, (slope * xx / 1e3 + offset) / 1e3, color="w", linewidth=3, linestyle="-"
+    )
+    ax.plot(
+        xx, (slope * xx / 1e3 + offset) / 1e3, color="C0", linewidth=2, linestyle="-"
+    )
 
     ke_ww_binned.plot(
-        ax=ax, mfc="C6", mec="w", marker="o", linewidth=3, linestyle="",
+        ax=ax,
+        mfc="C6",
+        mec="w",
+        marker="o",
+        linewidth=3,
+        linestyle="",
     )
 
     xx = np.arange(0, 1.1, 0.1)
     ax.plot(xx, (slope2 * xx / 1e3 + c2) / 1e3, color="w", linewidth=3, linestyle="-")
     ax.plot(xx, (slope2 * xx / 1e3 + c2) / 1e3, color="C6", linewidth=2, linestyle="-")
-    ax.set(xlabel="mode 1 wind-work [mW/m$^2$]", ylabel="mode 1 KE [kJ/m$^2$]", title="NISKINE mode 1 decay time scale")
+    ax.set(
+        xlabel="mode 1 wind-work [mW/m$^2$]",
+        ylabel="mode 1 KE [kJ/m$^2$]",
+        title="decay time scale",
+    )
 
 
 # %%
@@ -431,20 +452,13 @@ def group_speed(ke, flux, ax):
     ax.set(
         ylabel="mode 1 energy flux [W/m$^2$]",
         xlabel="mode 1 KE [J/m$^2$]",
-        title="NISKINE mode 1 group speed",
+        title="group speed",
     )
 
 
 # %%
 fig, ax = gv.plot.quickfig(fgs=(5, 4), fs=12)
 group_speed(ke_i, N.flux, ax)
-
-# %%
-# fig, ax = gv.plot.quickfig(fgs=(5, 4), fs=12, grid=True)
-# c_amp.plot.hist(bins=np.arange(0, 4.1, 0.1), rasterized=True);
-# ax.set(title=None, xlabel="${c_\mathrm{g}}_\mathrm{h}$ [m/s]", ylabel="pdf [count]");
-# niskine.io.pdf("mode1_cgh", subdir="low-mode-fluxes")
-# niskine.io.png("mode1_cgh", subdir="low-mode-fluxes")
 
 # %% [markdown]
 # ---
@@ -453,8 +467,13 @@ group_speed(ke_i, N.flux, ax)
 # Plot both fits together.
 
 # %%
-fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(10, 4),
-                       constrained_layout=True, gridspec_kw={'wspace': 0.1})
+fig, ax = plt.subplots(
+    nrows=1,
+    ncols=2,
+    figsize=(10, 4),
+    constrained_layout=True,
+    gridspec_kw={"wspace": 0.1},
+)
 
 group_speed(ke_i, N.flux, ax[0])
 decay_timescale(m1ww, ke_i, ax[1])
@@ -479,7 +498,7 @@ niskine.io.pdf("mode1_decay_time_scale_and_group_speed")
 # 74 W/m divided by 0.12 mW/m^2 $\approx$ 600 km.
 
 # %%
-upstream_forcing_km = 74/0.12
+upstream_forcing_km = 74 / 0.12
 print(f"upstream forcing region: {upstream_forcing_km:1.0f} km")
 
 # %% [markdown]
@@ -497,7 +516,7 @@ eps = 2e-9
 rho0 = 1025
 
 # %%
-dissipation_integrated = H*eps*rho0 * 1e3
+dissipation_integrated = H * eps * rho0 * 1e3
 
 # %%
 print(f"depth-integrated turbulent dissipation: {dissipation_integrated:1.3f} mW/m^2")

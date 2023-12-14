@@ -6,9 +6,9 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.0
+#       jupytext_version: 1.16.0
 #   kernelspec:
-#     display_name: Python [conda env:niskine]
+#     display_name: python3 (niskine)
 #     language: python
 #     name: conda-env-niskine-py
 # ---
@@ -31,8 +31,6 @@ import niskine
 
 # %reload_ext autoreload
 # %autoreload 2
-
-plt.ion()
 
 # %config InlineBackend.figure_format = 'retina'
 

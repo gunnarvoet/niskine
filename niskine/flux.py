@@ -795,7 +795,7 @@ def plot_up_one_time_step(flux, ti, nmodes=3):
 
 
 def plot_both_mode_fits_one_time_step(flux, ti):
-    fig, axx = plt.subplots(nrows=1, ncols=2, figsize=(7.5, 5),
+    fig, axx = plt.subplots(nrows=1, ncols=2, figsize=(7.5/1.2, 5/1.2),
                        constrained_layout=True, sharey=True)
     for axi in axx:
         gv.plot.axstyle(axi, grid=True)
@@ -818,7 +818,7 @@ def plot_both_mode_fits_one_time_step(flux, ti):
     flux.up.isel(time=ti).sum(dim="mode").plot(ax=ax, y="z", color="w", linewidth=2.5)
     flux.up.isel(time=ti).sum(dim="mode").plot(ax=ax, y="z", color="k", linewidth=1.5, label="$\sum$")
     gv.plot.xsym(ax=ax)
-    ax.set(ylabel="depth [m]", xlabel="eastward velocity u [m/s]", title="horizontal modes")
+    ax.set(ylabel="depth [m]", xlabel="eastward velocity u [m/s]", title="horizontal velocity modes")
     ax.legend(loc=(0.7, 0.3))
     # ax.legend(loc="best")
     tstr = gv.time.datetime64_to_str(flux.mooring.time.isel(time=ti), unit="m").replace("T", "\n")
@@ -836,7 +836,7 @@ def plot_both_mode_fits_one_time_step(flux, ti):
     etam.isel(time=ti).sum(dim="mode").plot(ax=ax, y="z", color="w", linewidth=2.5)
     etam.isel(time=ti).sum(dim="mode").plot(ax=ax, y="z", color="k", linewidth=1.5)
     gv.plot.xsym(ax=ax)
-    ax.set(ylabel="", xlabel="vertical displacement $\eta$ [m]", title="vertical modes")
+    ax.set(ylabel="", xlabel="vertical displacement $\eta$ [m]", title="vertical displacement modes")
     ax.invert_yaxis()
 
     gv.plot.subplotlabel(axx, fs=14, x=0.03, y=0.94)

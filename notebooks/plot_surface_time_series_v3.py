@@ -6,9 +6,9 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.15.2
+#       jupytext_version: 1.16.0
 #   kernelspec:
-#     display_name: Python [conda env:niskine]
+#     display_name: python3 (niskine)
 #     language: python
 #     name: conda-env-niskine-py
 # ---
@@ -295,7 +295,7 @@ vort.plot(
 ax.set(xlabel="", ylabel="")
 ax.yaxis.set_major_locator(mpl.ticker.MultipleLocator(base=0.1))
 ax.annotate(
-    r"vorticity $\zeta/f$",
+    r"normalized vorticity $\zeta/f$",
     xy=(0.95, 0.1),
     xycoords="axes fraction",
     backgroundcolor="w",
@@ -369,19 +369,22 @@ ax = axd["G"]
 ax.fill_betweenx(out["mp"].z, out["mp"]-1.96*out["mp_se"], out["mp"]+1.96*out["mp_se"], color="C3", alpha=0.2, edgecolor=None)
 ax.fill_betweenx(out["mn"].z, out["mn"]-1.95*out["mn_se"], out["mn"]+1.95*out["mn_se"], color="C0", alpha=0.2, edgecolor=None)
 
+conf_alpha = 0.5
+
+out["mp_hws"].plot(color="w", ax=ax, y="z", yincrease=False, linewidth=2)
+out["mp_hws"].plot(color="C3", ax=ax, y="z", yincrease=False, linestyle="--", alpha=conf_alpha)
+out["mp_lws"].plot(color="w", ax=ax, y="z", yincrease=False, linewidth=2)
+out["mp_lws"].plot(color="C3", ax=ax, y="z", yincrease=False, linestyle="-.", alpha=conf_alpha)
+
+out["mn_hws"].plot(color="w", ax=ax, y="z", yincrease=False, linewidth=2)
+out["mn_hws"].plot(color="C0", ax=ax, y="z", yincrease=False, linestyle="--", alpha=conf_alpha)
+out["mn_lws"].plot(color="w", ax=ax, y="z", yincrease=False, linewidth=2)
+out["mn_lws"].plot(color="C0", ax=ax, y="z", yincrease=False, linestyle="-.", alpha=conf_alpha)
+
 out["mp"].plot(color="w", linewidth=2, ax=ax, y="z", yincrease=False)
 out["mp"].plot(color="C3", ax=ax, y="z", yincrease=False, label=r"$\zeta/f > 0$")
-out["mp_hws"].plot(color="w", ax=ax, y="z", yincrease=False, linewidth=2)
-out["mp_hws"].plot(color="C3", ax=ax, y="z", yincrease=False, linestyle="--")
-out["mp_lws"].plot(color="w", ax=ax, y="z", yincrease=False, linewidth=2)
-out["mp_lws"].plot(color="C3", ax=ax, y="z", yincrease=False, linestyle="-.")
-
 out["mn"].plot(color="w", linewidth=2, ax=ax, y="z", yincrease=False)
 out["mn"].plot(color="C0", ax=ax, y="z", yincrease=False, label=r"$\zeta/f < 0$")
-out["mn_hws"].plot(color="w", ax=ax, y="z", yincrease=False, linewidth=2)
-out["mn_hws"].plot(color="C0", ax=ax, y="z", yincrease=False, linestyle="--")
-out["mn_lws"].plot(color="w", ax=ax, y="z", yincrease=False, linewidth=2)
-out["mn_lws"].plot(color="C0", ax=ax, y="z", yincrease=False, linestyle="-.")
 
 ax.legend(loc="lower right")
 ax.set(title="M1 $\mathrm{KE}_\mathrm{NI}$", xlabel="$\mathrm{KE}_\mathrm{NI}$ [J/m$^3$]");
