@@ -632,7 +632,7 @@ def _data_array_annotate(ax, da, time, text, offset, **kwargs):
     )
 
 
-def ni_ke_by_vort_and_wind():
+def ni_ke_by_vort_and_wind(wkb=True):
     cfg = niskine.io.load_config()
     rho0 = 1025
 
@@ -645,7 +645,10 @@ def ni_ke_by_vort_and_wind():
     alt.close()
 
     # load NI EKE
-    ni_eke = xr.open_dataarray(cfg.data.ni_eke_m1)
+    if wkb:
+        ni_eke = xr.open_dataarray(cfg.data.ni_eke_m1)
+    else:
+        ni_eke = xr.open_dataarray(cfg.data.ni_eke_m1_no_wkb)
     ni_eke.close()
 
     # interpolate vorticity to NI EKE

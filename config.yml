@@ -58,6 +58,7 @@ data:
     osnap_umm4_cumulative: $data/wind_work/ni_wind_work_osnap_umm4_integrated.nc
 
   ni_eke_m1: $data/ni_eke_m1.nc
+  ni_eke_m1_no_wkb: $data/ni_eke_m1_no_wkb.nc
   ni_eke_m2: $data/ni_eke_m2.nc
 
   # mixed layer properties

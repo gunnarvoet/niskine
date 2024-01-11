@@ -6,9 +6,9 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.15.2
+#       jupytext_version: 1.16.0
 #   kernelspec:
-#     display_name: Python [conda env:niskine]
+#     display_name: python3 (niskine)
 #     language: python
 #     name: conda-env-niskine-py
 # ---
@@ -32,8 +32,6 @@ import niskine
 
 # %reload_ext autoreload
 # %autoreload 2
-# %autosave 0
-
 # %config InlineBackend.figure_format = 'retina'
 
 # %%
@@ -152,8 +150,18 @@ def calc_ni_eke(adcp):
 
 
 # %%
+def calc_ni_eke_no_wkb(adcp):
+    rho = 1025
+    # calculate NI EKE
+    adcp["ni_eke"] = 0.5 * rho * (adcp.bpu ** 2 + adcp.bpv ** 2)
+    return adcp
+
+
+# %%
 a = ni_bandpass_adcp(adcp.copy())
 a = calc_ni_eke(a)
+a_no_wkb = ni_bandpass_adcp(adcp.copy())
+a_no_wkb = calc_ni_eke_no_wkb(a_no_wkb)
 
 # %%
 a_wide = ni_bandpass_adcp(adcp.copy(), bandwidth=c2)
@@ -165,6 +173,9 @@ a2 = calc_ni_eke(a2)
 
 # %%
 a.ni_eke.to_netcdf(cfg.data.ni_eke_m1)
+
+# %%
+a_no_wkb.ni_eke.to_netcdf(cfg.data.ni_eke_m1_no_wkb)
 
 # %%
 a2.ni_eke.to_netcdf(cfg.data.ni_eke_m2)
