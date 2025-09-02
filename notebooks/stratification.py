@@ -6,9 +6,9 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.0
+#       jupytext_version: 1.16.0
 #   kernelspec:
-#     display_name: Python [conda env:niskine]
+#     display_name: python3 (niskine)
 #     language: python
 #     name: conda-env-niskine-py
 # ---
@@ -143,6 +143,10 @@ tdn2 = (9.81 / 1025) * tdrhos.differentiate(coord="depth")
 
 # %%
 np.log10(tdn2).gv.tplot(vmin=-6.5, vmax=-4, cbar_kwargs=dict(aspect=30, shrink=0.7, ticks=mpl.ticker.MaxNLocator(5), pad=0.01, label="log$_{10}(N^2)$"), )
+niskine.io.png("N")
+
+# %%
+tdn2.to_netcdf(cfg.data.gridded.N_daily)
 
 # %% [markdown]
 # Okay, it seems hard to use the gridded temperature product to calculate stratification. What do we need it for? WKB scaling, but that could also work just with the climatology.
@@ -164,3 +168,5 @@ fig, ax = gv.plot.quickfig()
 woce.s.plot(hue="time", y="z", ax=ax)
 sd.mean(dim="time").plot(yincrease=False, y="depth", color="k", ax=ax)
 ax.set(ylim=[1000, 0])
+
+# %%
