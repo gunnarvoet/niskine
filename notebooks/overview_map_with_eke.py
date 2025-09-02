@@ -120,12 +120,39 @@ emfloat = pd.read_csv(
 )
 
 # %%
+colsB = [
+    "latitude",
+    "longitude",
+]
+emfloatB = pd.read_csv(
+    cfg.em_float_locationsB,
+    sep=" ",
+    # skiprows=[0],
+    header=None,
+    names=colsB,
+    index_col=False,
+)
+
+# %%
 emfloat
+
+# %%
+emfloatB
 
 # %%
 em_time = pd.to_datetime(
     emfloat[["year", "month", "day", "hour", "minute", "second"]]
 ).to_xarray()
+
+# %%
+dt = np.diff(em_time.data)
+
+# %%
+dti = dt.astype('<m8[s]').astype(int)
+
+# %%
+fig, ax = gv.plot.quickfig()
+ax.hist(dti)
 
 # %%
 em_lon = emfloat["longitude"]
@@ -136,6 +163,12 @@ fig, ax = gv.plot.quickfig()
 em_time.plot(ax=ax)
 
 # %%
+for i in [0, 180, 303, 412]:
+    t = gv.time.datetime64_to_str(em_time[i].data)
+    print(em_time[i])
+    print(t)
+
+# %%
 fig, ax = gv.plot.quickfig()
 ax.plot(em_time, em_lat, marker="o", markersize=3)
 gv.plot.concise_date(ax)
@@ -143,6 +176,14 @@ gv.plot.concise_date(ax)
 # %%
 fig, ax = gv.plot.quickfig()
 ax.plot(em_lon, em_lat)
+ax.plot(em_lon[303], em_lat[303], "ro")
+ax.plot(em_lon[412], em_lat[412], "ro")
+
+
+# %%
+fig, ax = gv.plot.quickfig()
+ax.plot(emfloatB["longitude"], emfloatB["latitude"])
+
 
 # %% [markdown]
 # ## Plot
@@ -276,6 +317,9 @@ explained[:3].sum()/explained[:5].sum()
 
 # %%
 explained[:10].plot(marker="o")
+
+# %% [markdown]
+# ## Overview Map
 
 # %%
 hsa = gv.maps.HillShade(-ss.data, ss.lon, ss.lat, smoothtopo=3)

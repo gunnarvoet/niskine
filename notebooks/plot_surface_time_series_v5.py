@@ -6,9 +6,9 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.16.0
+#       jupytext_version: 1.16.1
 #   kernelspec:
-#     display_name: python3 (niskine)
+#     display_name: Python [conda env:niskine]
 #     language: python
 #     name: conda-env-niskine-py
 # ---
@@ -89,6 +89,12 @@ N = niskine.flux.Flux(mooring=m1, bandwidth=1.06, runall=False, climatology="ARG
 # %%
 N.background_gradients()
 N.find_modes()
+
+# %%
+argo = gv.ocean.woce_argo_profile(-22, 50)
+
+# %%
+argo.rename(depth="z")
 
 # %%
 hmm = N.modes.hmodes.sel(mode=1).groupby("time.month").mean()
@@ -473,7 +479,7 @@ for letter in ["a", "b", "c", "d", "e", "h"]:
 gv.plot.annotate_corner("f", axd["F"], background_circle=True, addx=-0.005)
 gv.plot.annotate_corner("g", axd["G"], background_circle=True)
 
-plot_fig = True
+plot_fig = False
 if plot_fig:
     name = "surface_forcing_new5"
     niskine.io.png(name)
@@ -605,6 +611,226 @@ for kw, axi in ax.items():
 
 niskine.io.png("vel_and_t_and_modes")
 niskine.io.pdf("vel_and_t_and_modes")
+
+# %% [markdown]
+# Updated version 2025-04-30
+
+# %%
+ax = plt.figure(layout="constrained", figsize=(10, 7)).subplot_mosaic(
+    """
+    AD
+    BE
+    CE
+    """,
+    height_ratios=[1.2, 1, 1],
+    width_ratios=[2, 1],
+    gridspec_kw={
+        "wspace": 0.05,
+        "hspace": 0.05,
+    },
+    sharey=False,
+)
+
+velopts = dict(vmin=-0.75, vmax=0.75, rasterized=True, yincrease=False, cmap="RdBu_r")
+
+labelpos = (0.98, 0.01)
+bbox_opts = bbox=dict(
+        facecolor="w",
+        linestyle="",
+        edgecolor=None,
+        alpha=0.5,
+        boxstyle="Square,pad=0.1",
+    )
+ud.plot(
+    ax=ax["B"],
+    cbar_kwargs=dict(
+        aspect=30,
+        shrink=0.7,
+        pad=0.02,
+        label="[m$\,$s$^{-1}$]",
+        ticks=mpl.ticker.MaxNLocator(4),
+    ),
+    **velopts,
+)
+ax["B"].annotate(
+    "eastward velocity",
+    xy=labelpos,
+    xycoords="axes fraction",
+    backgroundcolor="w",
+    ha="right",
+    bbox=bbox_opts,
+)
+vd.plot(
+    ax=ax["C"],
+    cbar_kwargs=dict(
+        aspect=30,
+        shrink=0.7,
+        pad=0.02,
+        label="[m$\,$s$^{-1}$]",
+        ticks=mpl.ticker.MaxNLocator(4),
+    ),
+    **velopts,
+)
+ax["C"].annotate(
+    "northward velocity",
+    xy=labelpos,
+    xycoords="axes fraction",
+    # backgroundcolor="w",
+    ha="right",
+    bbox=bbox_opts,
+)
+
+h = td.plot.contourf(
+    ax=ax["A"],
+    cmap="Spectral_r",
+    levels=np.arange(3.5, 13.5, 0.5),
+    cbar_kwargs=dict(
+        label="[°C]", aspect=30, shrink=0.7, pad=0.02, ticks=mpl.ticker.MaxNLocator(4)
+    ),
+)
+gv.plot.contourf_hide_edges(h)
+ax["A"].set(xlim=[np.datetime64("2019-05-01"), np.datetime64("2020-10-10")])
+ax["A"].set(xlabel="", ylabel="depth [m]")
+ax["A"].annotate(
+    "temperature",
+    xy=labelpos,
+    xycoords="axes fraction",
+    backgroundcolor="w",
+    ha="right",
+    bbox=bbox_opts,
+)
+
+
+# temperature
+months = gv.time.month_str()
+# ax = ax["D"]
+gv.plot.cycle_cmap(n=12, cmap="plasma", ax=ax["D"])
+tm = td.sel(depth=slice(0, 1300)).groupby("time.month").mean()
+for g, tmi in tm.groupby("month"):
+    tmi.plot(
+        y="depth",
+        yincrease=False,
+        add_legend=False,
+        ax=ax["D"],
+        color="w",
+        linewidth=2.5,
+    )
+    tmi.plot(y="depth", yincrease=False, add_legend=False, ax=ax["D"])
+colors = [plt.get_cmap("plasma")(1.0 * i / 12) for i in range(12)]
+for (g, ti), col, month in zip(tm.groupby("month"), colors, months):
+    xi = ~np.isnan(ti)
+    x = ti.where(xi, drop=True)[0].item()
+    ax["D"].annotate(
+        month,
+        (x, -20),
+        ha="left",
+        va="center",
+        color=col,
+        rotation=75,
+        rotation_mode="anchor",
+        fontsize=9,
+    )
+
+# modes
+gv.plot.cycle_cmap(n=12, cmap="plasma", ax=ax["E"])
+for g, tmi in hmm.groupby("month"):
+    tmi.plot(
+        y="z",
+        yincrease=False,
+        add_legend=False,
+        ax=ax["E"],
+        color="w",
+        linewidth=2,
+    )
+    tmi.plot(y="z", yincrease=False, add_legend=False, ax=ax["E"])
+for g, tmi in vmm.groupby("month"):
+    tmi.plot(
+        y="z",
+        yincrease=False,
+        add_legend=False,
+        ax=ax["E"],
+        color="w",
+        linewidth=2,
+    )
+    tmi.plot(y="z", yincrease=False, add_legend=False, ax=ax["E"])
+
+
+# ax["E"].annotate("vertical modes", xy=(-0.6, 600), rotation=35, color="0.3")
+# ax["E"].annotate("horizontal modes", xy=(0.1, 1100), rotation=25, color="0.3")
+# ax["E"].set(xlabel="normalized mode amplitude", ylabel=None, title=None)
+
+ann_opts = dict(
+    color="0.3", bbox=dict(pad=1, facecolor="w", alpha=0.6, edgecolor="none")
+)
+ax["E"].annotate(r"$\eta$ modes", xy=(-0.6, 600), rotation=35, **ann_opts)
+ax["E"].annotate(r"$u$, $v$ modes", xy=(0.1, 1100), rotation=25, **ann_opts)
+ax["E"].set(xlabel="normalized mode amplitude", ylabel=None, title=None)
+
+# mark depths where Amy plots spectra
+depths = [320, 800, 1280]
+xlims = ax["E"].get_xlim()
+for zi, xi in zip(depths, [0.1, -0.4, 0.7]):
+    ax["E"].hlines(
+        zi, xlims[0], xlims[1], linestyle="--", color="0.3", linewidth=0.75, zorder=0
+    )
+    ax["E"].annotate(f"{zi} m", (xi, zi + 30), va="top", fontsize=10, **ann_opts)
+
+
+# gv.plot.subplotlabel(ax, x=0.01, y=0.88)
+
+for kw, axi in ax.items():
+    gv.plot.axstyle(axi)
+    axi.set(title="", xlabel="")
+
+gv.plot.concise_date(ax["C"])
+
+ax["A"].sharex(axd["C"])
+ax["B"].sharex(axd["C"])
+
+xlims = ax["B"].get_xlim()
+ylims = ax["B"].get_ylim()
+ax["C"].set(xlim=xlims, ylim=ylims)
+ax["A"].set(xlim=xlims, ylim=ylims)
+
+
+# ax["C"].set(ylim=(1550, -30))
+
+ax["D"].set(xlabel=r"$\Theta$ [°C]", title=None, ylabel="")
+# ax["D"].yaxis.tick_right()
+# ax["D"].yaxis.set_label_position('right')
+ax["D"].yaxis.set_tick_params(left=True, labelleft=True)
+ax["D"].yaxis.set_ticks_position("none")
+ax["D"].set(ylabel="depth [m]")
+# ax["D"].spines["left"].set_visible(False)
+# ax["D"].spines["right"].set_visible(True)
+
+
+# ax["A"].get_shared_y_axes().remove(ax["E"])
+# ax["A"].set(ylim=(1500, 0))
+ax["E"].set(ylim=(3000, 0))
+ax["E"].yaxis.set_tick_params(left=True, labelleft=True)
+ax["E"].yaxis.set_ticks_position("none")
+ax["E"].set(
+    yticks=np.arange(0, 3500, 500),
+    ylabel="depth [m]",
+    xlabel="normalized mode amplitude",
+)
+
+
+yoffsets = dict(A=0.03, B=0.03, C=0.03, D=0.03, E=0.07)
+for kw, axi in ax.items():
+    gv.plot.annotate_corner(
+        kw.lower(),
+        ax=axi,
+        background_circle=True,
+        addy=yoffsets[kw] + 0.01,
+        addx=-0.012,
+        fs=12,
+    )
+
+if True:
+    niskine.io.png("vel_and_t_and_modes_v2")
+    niskine.io.pdf("vel_and_t_and_modes_v2")
 
 # %%
 fig, ax = plt.subplots(nrows=3, ncols=1, figsize=(8, 5),
