@@ -38,6 +38,7 @@ data:
     temperature_10m_mat: $data/input/temperature/InterpolatedM1_10mBins.mat
     temperature_mat: $data/input/temperature/M1Temperature.mat
     temperature_10m_nc: $data/gridded/temperature/t_10m.nc
+    N_daily: $data/gridded/N_daily.nc
 
   ssh: $data/ssh/
   ssh_m1: $data/ssh/m1_ssh.nc
@@ -61,6 +62,9 @@ data:
   ni_eke_m1_no_wkb: $data/ni_eke_m1_no_wkb.nc
   ni_eke_m2: $data/ni_eke_m2.nc
 
+  ni_low_mode_flux_niskine_m1: $data/ni_low_mode_flux_niskine_m1.nc
+  ni_low_mode_flux_osnap_umm4: $data/ni_low_mode_flux_osnap_umm4.nc
+
   # mixed layer properties
   ml:
     # mixed layer depth
@@ -79,3 +83,4 @@ mooring_locations: $data/niskine_mooring_locations.nc
 m1_sensor_config: $data/m1_sensor_distribution.csv
 
 em_float_locations: $data/em-float/fllog7806
+em_float_locationsB: $data/em-float/fllogB7806

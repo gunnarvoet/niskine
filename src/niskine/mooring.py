@@ -115,7 +115,7 @@ class NISKINeMooring(Mooring):
         # Read gridded ADCP data and subsample to one hour.
         self.adcp = (
             niskine.io.load_gridded_adcp(mooring=self.mooring)
-            .resample(time="1H")
+            .resample(time="1h")
             .mean()
         )
         self.adcp = self.adcp.transpose("z", "time", "adcp")
@@ -133,9 +133,9 @@ class NISKINeMooring(Mooring):
         v = v.interpolate_na(dim="time").dropna(dim="time")[1:]
 
         # Bin-average to hourly values and interpolate to common time vector
-        u = u.resample(time="1H").mean()
+        u = u.resample(time="1h").mean()
         u = u.interp(time=self.time.astype('datetime64[ns]'))
-        v = v.resample(time="1H").mean()
+        v = v.resample(time="1h").mean()
         v = v.interp(time=self.time.astype('datetime64[ns]'))
 
         cm = xr.Dataset(
@@ -435,12 +435,13 @@ class OSNAPMooring(Mooring):
     def get_bottom_depth(self):
         ss = -1 * (
             gv.ocean.smith_sandwell(lon=np.array([self.lon]), lat=np.array([self.lat]))
-            .load()
-            .squeeze()
+            # .load()
+            # .squeeze()
         )
-        self.depth = ss.data
-        self.depth = ss.data
-        self.bottom_depth = ss.item()
+        # self.depth = ss.data
+        # self.bottom_depth = ss.item()
+        self.depth = ss
+        self.bottom_depth = ss
 
     def add_location_data(self):
         self.get_position()

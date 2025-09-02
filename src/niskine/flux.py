@@ -350,6 +350,7 @@ def calc_modes_seasonal(mooring, N2, nmodes=3):
     N2i = []
     assert N2.time.shape[0] == 12
     for g, Ni in N2.groupby("time"):
+        Ni = Ni.squeeze()
         # vmodes, hmodes, modes = calc_modes(mooring, Ni, nmodes=nmodes)
         modes = calc_modes(mooring, Ni, nmodes=nmodes)
         N2i.append(modes)
@@ -375,7 +376,7 @@ def project_eta_on_modes(mooring, modes, nmodes=3):
         ):
             ni = np.flatnonzero(np.isfinite(etai))
             beta_eta[i, :] = project_on_vmodes(
-                etai.data[ni], etaz[ni], modei.vmodes.data, modei.z.data
+                etai.squeeze().data[ni], etaz[ni], modei.squeeze().vmodes.data, modei.squeeze().z.data
             )
         # pack beta_hat into DataArray
         beta_eta = beta_to_array(mooring, nmodes, beta_eta)
@@ -415,9 +416,9 @@ def project_vels_on_modes(mooring, binbpu, binbpv, modes, nmodes=3):
     if "time" in modes.dims:
         for i, (g, modei) in enumerate(modes.groupby("time")):
             u, z = combine_adcp_cm_one_timestep(mooring, binbpu, binbpu.z_bins, i)
-            beta_u[i, :] = project_on_modes(u, z, modei.hmodes, modei.z.data)
+            beta_u[i, :] = project_on_modes(u, z, modei.squeeze().hmodes, modei.squeeze().z.data)
             v, z = combine_adcp_cm_one_timestep(mooring, binbpv, binbpv.z_bins, i)
-            beta_v[i, :] = project_on_modes(v, z, modei.hmodes, modei.z.data)
+            beta_v[i, :] = project_on_modes(v, z, modei.squeeze().hmodes, modei.squeeze().z.data)
     else:
         for i in range(nt):
             u, z = combine_adcp_cm_one_timestep(mooring, binbpu, binbpu.z_bins, i)
@@ -683,25 +684,25 @@ def interpolate_seasonal_modes_to_mooring(mooring, modes):
     # vmodes
     vmodes = []
     for g, modei in modes.vmodes.groupby("mode"):
-        vmodes.append(niskine.clim.interpolate_seasonal_data(mooring.time, modei))
+        vmodes.append(niskine.clim.interpolate_seasonal_data(mooring.time, modei.squeeze()))
     vmodes = xr.concat(vmodes, dim="mode")
     vmodes.coords["mode"] = (["mode"], modes.mode.data)
     # hmodes
     hmodes = []
     for g, modei in modes.hmodes.groupby("mode"):
-        hmodes.append(niskine.clim.interpolate_seasonal_data(mooring.time, modei))
+        hmodes.append(niskine.clim.interpolate_seasonal_data(mooring.time, modei.squeeze()))
     hmodes = xr.concat(hmodes, dim="mode")
     hmodes.coords["mode"] = (["mode"], modes.mode.data)
     # eigenspeed
     eigenspeed = []
     for g, modei in modes.eigenspeed.groupby("mode"):
-        eigenspeed.append(niskine.clim.interpolate_seasonal_data(mooring.time, modei))
+        eigenspeed.append(niskine.clim.interpolate_seasonal_data(mooring.time, modei.squeeze()))
     eigenspeed = xr.concat(eigenspeed, dim="mode")
     eigenspeed.coords["mode"] = (["mode"], modes.mode.data)
     # equivalent depth
     equivalent_depth = []
     for g, modei in modes.equivalent_depth.groupby("mode"):
-        equivalent_depth.append(niskine.clim.interpolate_seasonal_data(mooring.time, modei))
+        equivalent_depth.append(niskine.clim.interpolate_seasonal_data(mooring.time, modei.squeeze()))
     equivalent_depth = xr.concat(equivalent_depth, dim="mode")
     equivalent_depth.coords["mode"] = (["mode"], modes.mode.data)
     # combine

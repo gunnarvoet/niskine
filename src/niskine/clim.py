@@ -62,7 +62,7 @@ def climatology_woce(lon, lat, bottom_depth):
     zmax = bottom_depth + 10 - bottom_depth % 10
     znew = np.arange(0, zmax, 10)
     N2 = N2.interp(depth=znew)
-    N2.attrs = dict(long_name="N$^2$", units="1/s$^2$")
+    N2.attrs = dict(long_name="N$^2$", units="(rad/s)$^2$")
     N2.depth.attrs = dict(long_name="depth", units="m")
     # temperature gradient
     Tz = wprf.th.differentiate("depth")
@@ -133,6 +133,9 @@ def climatology_argo_woce(lon, lat, bottom_depth):
             "Dec",
         ],
     )
+    # The new WOCE-Argo code has depth instead of z as coordinate name. Change this back for the code here to work.
+    if "depth" in argo:
+        argo = argo.rename(depth="z")
     # Calculate pressure from depth.
     argo["p"] = (["z"], gsw.p_from_z(-argo.z, lat).data)
     argo = argo.transpose("z", "time")
@@ -151,6 +154,7 @@ def climatology_argo_woce(lon, lat, bottom_depth):
     N2s = xr.DataArray(data=N2s, dims=["z", "time"])
     N2s.coords["time"] = argo.time
     for i, (g, argoi) in enumerate(argo.groupby("time")):
+        argoi = argoi.squeeze()
         argois = argoi.sortby("sg0")
         argois["z"] = argoi.z
         ptmp = gsw.p_from_z(-argoi.z, lat=lat)
@@ -178,7 +182,7 @@ def climatology_argo_woce(lon, lat, bottom_depth):
     zmax = bottom_depth + 10 - bottom_depth % 10
     znew = np.arange(0, zmax, 10)
     N2 = N2s.interp(z=znew)
-    N2.attrs = dict(long_name="N$^2$", units="1/s$^2$")
+    N2.attrs = dict(long_name="N$^2$", units="(rad/s)$^2$")
     N2.z.attrs = dict(long_name="depth", units="m")
     N2.name = "N2"
 
@@ -186,6 +190,7 @@ def climatology_argo_woce(lon, lat, bottom_depth):
     CT = argo.CT.where(np.isfinite(argo.CT), drop=True)
     tz = []
     for i, (g, CTi) in enumerate(CT.groupby("time")):
+        CTi = CTi.squeeze()
         CTs = CTi.sortby(CTi, ascending=False)
         CTs["z"] = CTi.z.data
         tz.append(CTs.differentiate("z"))

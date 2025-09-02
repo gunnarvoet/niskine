@@ -1,0 +1,83 @@
+[build-system]
+requires = ["uv_build>=0.8.2,<0.9.0"]
+build-backend = "uv_build"
+
+[project]
+name = "niskine"
+version = "2025.08.0"
+authors = [
+    {name = "Gunnar Voet", email = 'gvoet@ucsd.edu'},
+    ]
+description = "NISKINe analysis package"
+readme = "README.md"
+# license = {file = "LICENSE"}
+keywords = ["physical oceanography"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "License :: OSI Approved :: MIT License",
+    "Natural Language :: English",
+    "Programming Language :: Python :: 3",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Oceanography",
+    ]
+requires-python = ">= 3.12"
+dependencies = [
+    "argopy>=0.1.15",
+    "cartopy>=0.25.0",
+    "cdsapi>=0.7.6",
+    "cfgrib>=0.9.15.0",
+    "cmocean>=4.0.3",
+    "eofs>=2.0.0",
+    "gsw>=3.6.20",
+    "gvpy",
+    "matplotlib>=3.10.5",
+    "metpy>=1.7.0",
+    # "motuclient>=3.0.0",
+    "motuclient>=3.0.0",
+    "netcdf4>=1.7.2",
+    "numpy>=2.3.2",
+    "palettable>=3.3.3",
+    "pandas>=2.3.2",
+    "pycurrents",
+    "python-box>=7.3.2",
+    "scipy>=1.16.1",
+    "setuptools>=80.9.0",
+    "tqdm>=4.67.1",
+    "utide>=0.3.1",
+    "velosearaptor",
+    "xarray>=2025.8.0",
+]
+
+[project.urls]
+# Homepage = "https://example.com"
+# Documentation = "https://readthedocs.org"
+Repository = "https://github.com/gunnarvoet/niskine.git"
+Issues = "https://github.com/gunnarvoet/niskine/issues"
+Changelog = "https://github.com/gunnarvoet/niskine/blob/main/HISTORY.md"
+
+[dependency-groups]
+dev = [
+    "ipdb>=0.13.13",
+    "ipykernel>=6.29.5",
+    "jupyter-console>=6.6.3",
+    "jupyter-core>=5.8.1",
+    "notebook>=7.4.5",
+]
+
+[tool.pytest.ini_options]
+# in general, do not place a `__init__.py` in your tests
+# options are explained here:
+# https://learn.scientific-python.org/development/guides/pytest/
+# minversion = "6.0"
+# addopts = ["-ra", "--showlocals", "--strict-markers", "--strict-config"]
+# xfail_strict = true
+# filterwarnings = ["error"]
+# log_cli_level = "info"
+testpaths = ["niskine/tests"]
+
+[tool.uv.sources]
+gvpy = { path = "../../python/gvpy", editable = true }
+pycurrents = { path = "../../python/pycurrents" }
+ctdproc = { path = "../../python/ctdproc", editable = true }
+velosearaptor = { path = "../../python/velosearaptor", editable = true }
+underway = { path = "../../python/underway", editable = true }
