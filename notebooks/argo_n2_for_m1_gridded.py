@@ -6,9 +6,9 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.0
+#       jupytext_version: 1.16.0
 #   kernelspec:
-#     display_name: Python [conda env:niskine]
+#     display_name: python3 (niskine)
 #     language: python
 #     name: conda-env-niskine-py
 # ---
@@ -55,6 +55,9 @@ an2 = niskine.clim.interpolate_seasonal_data(adcp.time, n2a)
 n2 = an2.interp_like(adcp)
 
 # %%
+# n2a.rename(z="depth").to_netcdf("../data/woce_argo_N2_niskine_M1.nc")
+
+# %%
 # n2.to_netcdf("argo_n2_at_m1.nc")
 # an2.to_netcdf("argo_n2_at_m1_full_depth.nc")
 
@@ -79,7 +82,8 @@ test = gv.io.loadmat("../data/N2.mat")
 
 # %%
 fig, ax = gv.plot.quickfig()
-ax.plot(test["N2"], test["depth"])
+ax.plot(np.sqrt(test["N2"]), test["depth"])
 ax.set(xscale="log")
+ax.invert_yaxis()
 
 # %%
